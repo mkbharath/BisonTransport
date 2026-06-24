@@ -1,0 +1,45 @@
+From: logistics@cantire.com
+To: orders@orderplatform.local
+Subject: Shipment Request - Store Fixtures to Calgary
+Date: Mon, 23 Jun 2026 10:30:00 -0400
+Message-ID: <demo4-001@cantire.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="utf-8"
+
+Hello,
+
+We need to ship store fixtures from our Brampton warehouse to our Calgary store.
+
+Customer: Canadian Tire Corporation
+Contact: Mike Chen
+Email: mike.chen@cantire.com
+Phone: 905-555-0134
+
+PICKUP:
+Location: Canadian Tire DC Brampton
+Address: 400 Chrysler Drive, Brampton, ON L6S 6B4, Canada
+Instructions: Loading dock B, forklift available on site
+
+DELIVERY:
+Location: Canadian Tire Store #428
+Address: 11 Heritage Gate SE, Calgary, AB T2H 3A1, Canada
+Date: July 15, 2026
+Time: 07:00 - 11:00
+Instructions: Rear entrance only, call store manager on arrival
+
+SHIPMENT:
+Customer Order Number: CT-2026-88712
+Commodity: Retail store fixtures and shelving units
+Freight Type: FTL
+Weight: 38,500 lbs
+Pallets: 20
+Stackable: No
+
+EQUIPMENT: Dry Van, 53ft
+
+Hazmat: No
+Special Handling: Fragile items - handle with care, do not stack
+
+Thanks,
+Mike Chen
+Canadian Tire Logistics

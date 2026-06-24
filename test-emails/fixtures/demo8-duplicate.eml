@@ -1,0 +1,38 @@
+From: dispatch@mapleleaf.com
+To: orders@orderplatform.local
+Subject: Re: New Shipment Request - Frozen Chicken Products to Toronto
+Date: Mon, 23 Jun 2026 09:45:00 -0400
+Message-ID: <demo8-001@mapleleaf.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="utf-8"
+
+Hi Team,
+
+Apologies, not sure if my earlier email went through. Resending the shipment request:
+
+Customer: Maple Leaf Foods Inc.
+Contact: Sarah Johnson
+Email: sarah.johnson@mapleleaf.com
+Phone: (905) 285-5500
+
+PICKUP:
+Location: Maple Leaf Foods Distribution Center
+Address: 6985 Financial Drive, Mississauga, ON L5N 0A1, Canada
+Date: July 7, 2026
+Time: 08:00 - 12:00
+
+DELIVERY:
+Location: Loblaws Distribution Centre
+Address: 1 Presidents Choice Circle, Brampton, ON L6Y 5S5, Canada
+Date: July 8, 2026
+Time: 06:00 - 10:00
+
+Commodity: Frozen Chicken Products
+FTL, 42000 lbs, 24 pallets, Reefer (-18 to -22C), 53ft
+
+PO: MLF-2026-44521
+
+No hazmat. Maintain cold chain.
+
+Thanks,
+Sarah

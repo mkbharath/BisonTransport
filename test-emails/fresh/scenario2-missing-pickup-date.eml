@@ -1,0 +1,44 @@
+From: shipping@krugerproducts.ca
+To: orders@orderplatform.local
+Subject: Shipment Request - Paper Products to Edmonton
+Date: Tue, 24 Jun 2026 11:00:00 -0400
+Message-ID: <1f33d2a3@krugerproducts.ca>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="utf-8"
+
+Hello,
+
+We need to arrange a shipment from our Gatineau mill to Edmonton.
+
+Customer: Kruger Products
+Contact: David Wilson
+Email: david.wilson@krugerproducts.ca
+Phone: 819-555-0177
+
+PICKUP:
+Location: Kruger Products Mill
+Address: 200 Rue de Carillon, Gatineau, QC J8P 3S3, Canada
+Instructions: Use south gate entrance
+
+DELIVERY:
+Location: Superstore DC Edmonton
+Address: 16940 114 Avenue NW, Edmonton, AB T5M 2Z8, Canada
+Date: July 20, 2026
+Time: 08:00 - 14:00
+
+SHIPMENT:
+PO: KP-2026-55890
+Commodity: Bathroom tissue and paper towels (consumer packaged)
+Freight Type: FTL
+Weight: 28,000 lbs
+Pallets: 26
+Stackable: Yes
+
+Equipment: Dry Van 53ft
+
+Hazmat: No
+Notes: Lightweight but high volume. Full trailer load by cube.
+
+Thanks,
+David Wilson
+Kruger Products

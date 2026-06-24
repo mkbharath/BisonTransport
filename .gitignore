@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.venv/
+venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Node
+node_modules/
+packages/frontend/dist/
+
+# Environment
+.env
+.env.local
+!.env.example
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker volumes
+docker-data/
+
+# Test emails processed
+test-emails/inbox/*.eml
+
+# MinIO data
+minio-data/
+
+# Postgres data
+postgres-data/
+
+# Redis data
+redis-data/
+
+# Coverage
+htmlcov/
+.coverage
+coverage.xml

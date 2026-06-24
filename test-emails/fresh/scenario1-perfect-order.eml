@@ -1,0 +1,51 @@
+From: logistics@saputo.com
+To: orders@orderplatform.local
+Subject: Transportation Order - Dairy Products to Vancouver
+Date: Tue, 24 Jun 2026 10:00:00 -0400
+Message-ID: <bf286728@saputo.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="utf-8"
+
+Hi Team,
+
+Please arrange the following shipment:
+
+Customer: Saputo Inc.
+Contact: Marie Tremblay
+Email: marie.tremblay@saputo.com
+Phone: (514) 328-6662
+
+PICKUP:
+Location: Saputo Dairy Processing Plant
+Address: 6869 Boulevard Metropolitain Est, Montreal, QC H1P 1X8, Canada
+Date: July 10, 2026
+Time: 05:00 - 08:00
+Instructions: Dock 3, temperature log required at loading
+
+DELIVERY:
+Location: Save-On-Foods Distribution Centre
+Address: 19855 92A Avenue, Langley, BC V1M 3B6, Canada
+Date: July 14, 2026
+Time: 06:00 - 10:00
+Instructions: Report to receiving office first
+
+SHIPMENT:
+PO Number: SAP-2026-77123
+Commodity: Fresh dairy products - cheese wheels and butter blocks
+Freight Type: FTL
+Weight: 38,000 lbs
+Pallets: 22
+Stackable: No
+
+EQUIPMENT:
+Type: Reefer
+Temperature: 2C to 4C
+Size: 53ft
+
+Hazmat: No
+Special Handling: Maintain cold chain at all times. Temperature monitoring required.
+
+Please confirm.
+
+Marie Tremblay
+Saputo Logistics

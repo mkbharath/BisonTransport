@@ -1,0 +1,52 @@
+From: logistics@irvingoil.com
+To: orders@orderplatform.local
+Subject: HAZMAT - Fuel Additive Shipment
+Date: Tue, 24 Jun 2026 14:00:00 -0400
+Message-ID: <86cce6ec@irvingoil.com>
+MIME-Version: 1.0
+Content-Type: text/plain; charset="utf-8"
+
+URGENT - HAZMAT SHIPMENT
+
+Customer: Irving Oil
+Contact: Patricia Drummond
+Email: patricia.drummond@irvingoil.com
+Phone: (506) 202-4000
+
+PICKUP:
+Location: Irving Oil Refinery
+Address: 589 Grandview Avenue, Saint John, NB E2J 4M5, Canada
+Date: July 11, 2026
+Time: 06:00 - 09:00
+Instructions: HAZMAT loading bay only. Driver requires TWIC card and safety orientation.
+
+DELIVERY:
+Location: Irving Oil Terminal Montreal
+Address: 10500 Sherbrooke Street East, Montreal, QC H1B 1B3, Canada
+Date: July 12, 2026
+Time: 08:00 - 12:00
+Instructions: Report to terminal control office. HAZMAT placards required.
+
+SHIPMENT:
+PO: IRV-2026-HAZ-0091
+Commodity: Fuel additives - petroleum distillates
+Freight Type: FTL
+Weight: 44,000 lbs
+Pallets: 20 (double-stacked IBC totes on pallets)
+Stackable: No
+
+EQUIPMENT:
+Type: Tanker
+Size: Standard
+
+HAZMAT INFORMATION:
+Hazmat: YES
+UN Number: UN1268
+Hazmat Class: Class 3 - Flammable Liquids
+
+Special Handling: Full HAZMAT compliance required. Emergency response guide on board.
+TWIC Card Required: Yes
+Team Drive: No
+
+Patricia Drummond
+Irving Oil Logistics
