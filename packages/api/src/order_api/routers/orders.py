@@ -308,13 +308,26 @@ async def approve_order(
         adapters = get_adapters()
         async with async_session_factory() as session:
             result = await session.execute(
-                text("SELECT order_number, customer_name, contact_email, pickup_date, delivery_date, equipment_type FROM orders WHERE id = :id"),
+                text("SELECT order_number, customer_name, contact_email, pickup_date, delivery_date, equipment_type, source_email_id FROM orders WHERE id = :id"),
                 {"id": order_id},
             )
             order_data = result.mappings().first()
 
         if order_data and order_data.get("contact_email"):
             from order_shared.adapters.base import EmailMessage
+
+            # Get the original email message_id for threading
+            original_message_id = None
+            if order_data.get("source_email_id"):
+                async with async_session_factory() as session:
+                    result = await session.execute(
+                        text("SELECT message_id FROM emails WHERE id = :id"),
+                        {"id": str(order_data["source_email_id"])},
+                    )
+                    row = result.fetchone()
+                    if row:
+                        original_message_id = row[0]
+
             customer_name = order_data.get("customer_name") or "Customer"
             order_number = order_data["order_number"]
             contact_email = order_data["contact_email"]
@@ -327,6 +340,8 @@ async def approve_order(
                 subject=f"Order Confirmed: {order_number}",
                 body_html=f"<p>Dear {customer_name},</p><p>Your transportation order has been confirmed.</p><p><strong>Order Number:</strong> {order_number}<br><strong>Pickup Date:</strong> {pickup_date}<br><strong>Delivery Date:</strong> {delivery_date}<br><strong>Equipment:</strong> {equipment}</p><p>Best regards,<br>Order Processing Team</p>",
                 body_text=f"Dear {customer_name},\n\nYour order has been confirmed.\n\nOrder Number: {order_number}\nPickup Date: {pickup_date}\nDelivery Date: {delivery_date}\nEquipment: {equipment}\n\nBest regards,\nOrder Processing Team",
+                in_reply_to=original_message_id,
+                references=[original_message_id] if original_message_id else [],
             )
             await adapters.email.send_email(email_msg)
     except Exception:

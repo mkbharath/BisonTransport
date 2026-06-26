@@ -91,7 +91,7 @@ class OrderCreationAgent(BaseAgent):
         )
 
     async def _send_acknowledgement(self, order: Any) -> None:
-        """Send order acknowledgement email to customer."""
+        """Send order acknowledgement email as a reply in the same thread."""
         adapters = get_adapters()
 
         customer_name = order.get("customer_name", "Customer")
@@ -100,6 +100,36 @@ class OrderCreationAgent(BaseAgent):
         pickup_date = str(order.get("pickup_date", "TBD"))
         delivery_date = str(order.get("delivery_date", "TBD"))
         equipment = order.get("equipment_type", "N/A")
+
+        # Get the original email's message_id for threading
+        # Use the MOST RECENT email linked to this order (customer's latest reply)
+        original_message_id = None
+        source_email_id = order.get("source_email_id")
+        if source_email_id:
+            async with async_session_factory() as session:
+                from sqlalchemy import text as sa_text
+                # Find the latest email in the thread for this order
+                result = await session.execute(
+                    sa_text("""
+                        SELECT message_id FROM emails
+                        WHERE linked_order_id = :order_id
+                        ORDER BY created_at DESC
+                        LIMIT 1
+                    """),
+                    {"order_id": str(order.get("id"))},
+                )
+                row = result.fetchone()
+                if row:
+                    original_message_id = row[0]
+                else:
+                    # Fallback to source email
+                    result = await session.execute(
+                        sa_text("SELECT message_id FROM emails WHERE id = :id"),
+                        {"id": str(source_email_id)},
+                    )
+                    row = result.fetchone()
+                    if row:
+                        original_message_id = row[0]
 
         html_body = f"""<p>Dear {customer_name},</p>
 <p>Your transportation order has been successfully created.</p>
@@ -127,10 +157,12 @@ Order Processing Team"""
             subject=f"Order Confirmed: {order_number}",
             body_html=html_body,
             body_text=text_body,
+            in_reply_to=original_message_id,
+            references=[original_message_id] if original_message_id else [],
         )
 
         try:
             await adapters.email.send_email(email_msg)
-            self.logger.info(f"Acknowledgement email sent to {contact_email}")
+            self.logger.info(f"Acknowledgement email sent to {contact_email} (in thread)")
         except Exception as e:
             self.logger.warning(f"Failed to send acknowledgement: {e}")

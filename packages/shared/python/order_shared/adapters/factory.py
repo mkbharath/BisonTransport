@@ -88,11 +88,28 @@ def _create_local_adapters() -> Adapters:
         region=os.environ.get("STORAGE_REGION", "us-east-1"),
     )
 
-    email = MailHogEmailSender(
-        host=os.environ.get("SMTP_HOST", "localhost"),
-        port=int(os.environ.get("SMTP_PORT", "1025")),
-        default_from=os.environ.get("EMAIL_FROM_ADDRESS", "orders@orderplatform.local"),
-    )
+    email_mode = os.environ.get("EMAIL_INTAKE_MODE", "file_watcher")
+
+    if email_mode == "msgraph":
+        from order_shared.adapters.msgraph_email import MSGraphEmailSender
+
+        msgraph_tenant = os.environ.get("MSGRAPH_TENANT_ID", "")
+        msgraph_client = os.environ.get("MSGRAPH_CLIENT_ID", "")
+        msgraph_secret = os.environ.get("MSGRAPH_CLIENT_SECRET", "")
+        msgraph_mailbox = os.environ.get("MSGRAPH_MAILBOX", "iltransport@ideyalabs.com")
+
+        email = MSGraphEmailSender(
+            tenant_id=msgraph_tenant,
+            client_id=msgraph_client,
+            client_secret=msgraph_secret,
+            mailbox=msgraph_mailbox,
+        )
+    else:
+        email = MailHogEmailSender(
+            host=os.environ.get("SMTP_HOST", "localhost"),
+            port=int(os.environ.get("SMTP_PORT", "1025")),
+            default_from=os.environ.get("EMAIL_FROM_ADDRESS", "orders@orderplatform.local"),
+        )
 
     anthropic_key = os.environ.get("ANTHROPIC_API_KEY", "")
     openai_key = os.environ.get("OPENAI_API_KEY", "")

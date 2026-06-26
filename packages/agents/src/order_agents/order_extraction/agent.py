@@ -480,11 +480,17 @@ Return ONLY valid JSON.""",
         # Recompute confidence with the updated fields
         field_scores = order.get("field_confidence_scores") or {}
         if isinstance(field_scores, str):
-            field_scores = json.loads(field_scores)
+            try:
+                field_scores = json.loads(field_scores)
+            except (json.JSONDecodeError, TypeError):
+                field_scores = {}
+
         # Set high confidence for fields just provided by customer
         for f in extracted_fields.keys():
             field_scores[f] = 95.0
 
+        # Also set confidence for fields that already have values on the order
+        # (they were extracted originally but scores may have been lost)
         from order_shared.utils.confidence import compute_weighted_confidence
         mandatory_fields = [
             "customer_name", "contact_name", "contact_email",
@@ -493,7 +499,31 @@ Return ONLY valid JSON.""",
             "commodity", "freight_type", "total_weight", "weight_unit",
             "equipment_type", "hazmat_indicator",
         ]
+        for f in mandatory_fields:
+            if f not in field_scores or field_scores[f] == 0:
+                # Check if the order already has a value for this field
+                order_value = order.get(f)
+                if order_value is not None and order_value != "" and order_value is not False:
+                    field_scores[f] = 90.0  # Existing value = high confidence
+
         overall_confidence = compute_weighted_confidence(field_scores, mandatory_fields)
+
+        # Update confidence scores on the order itself
+        async with async_session_factory() as session:
+            await session.execute(
+                text("""
+                    UPDATE orders
+                    SET field_confidence_scores = CAST(:scores AS jsonb),
+                        overall_confidence_score = :confidence
+                    WHERE id = :id
+                """),
+                {
+                    "scores": json.dumps(field_scores),
+                    "confidence": overall_confidence,
+                    "id": related_order_id,
+                },
+            )
+            await session.commit()
 
         await adapters.queue.publish_message(
             queue_name="validation",

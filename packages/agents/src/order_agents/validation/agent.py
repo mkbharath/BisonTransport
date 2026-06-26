@@ -75,8 +75,12 @@ class ValidationAgent(BaseAgent):
                 "message": "Potential duplicate order detected",
             })
 
-        # Persist validation results
+        # Persist validation results (clear old results first)
         async with async_session_factory() as session:
+            await session.execute(
+                text("DELETE FROM validation_results WHERE order_id = :order_id"),
+                {"order_id": order_id},
+            )
             for vr in validation_results:
                 await session.execute(
                     text("""
@@ -102,21 +106,6 @@ class ValidationAgent(BaseAgent):
         # Route by confidence
         has_missing = len(missing_mandatory) > 0
         is_hazmat = bool(order_row.get("hazmat_indicator"))
-
-        # Special case: if fields are "missing" but overall confidence is in HITL range,
-        # and the missing fields have non-zero confidence scores (LLM tried but wasn't sure),
-        # route to HITL for human review instead of auto-emailing customer.
-        # This handles ambiguous orders where the LLM extracted partial/uncertain data.
-        if has_missing and overall_confidence >= 80:
-            # Check if "missing" fields actually have some confidence (LLM saw something)
-            ambiguous_fields = [
-                f for f in missing_mandatory
-                if confidence_scores.get(f, 0) > 0
-            ]
-            if ambiguous_fields:
-                # LLM extracted something but validator couldn't find it in the DB column
-                # (possible extraction format mismatch) — route to HITL for human verification
-                has_missing = False  # Override: don't treat as truly missing
 
         route = route_by_confidence(
             overall_confidence=overall_confidence,
