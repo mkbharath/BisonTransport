@@ -65,15 +65,26 @@ class ValidationAgent(BaseAgent):
         # 2. Business rule validation
         self._apply_business_rules(order_row, rules, validation_results)
 
-        # 3. Duplicate detection
-        is_duplicate = await self._check_duplicate(order_row)
-        if is_duplicate:
-            validation_results.append({
-                "field_name": "_duplicate",
-                "rule_name": "duplicate_detection",
-                "status": "warning",
-                "message": "Potential duplicate order detected",
-            })
+        # 3. Duplicate detection (only check if fewer than 3 mandatory fields are missing)
+        # Orders with many missing fields are clearly new/incomplete, not duplicates
+        is_duplicate = False
+        if len(missing_mandatory) < 3:
+            is_duplicate = await self._check_duplicate(order_row)
+            if is_duplicate:
+                # Extra check: if this order was previously in 'awaiting_customer' and just got
+                # re-validated after customer response, it's not a real duplicate
+                if order_row.get("status") == "extracted" and order_row.get("processing_mode") is not None:
+                    # This order was re-submitted for validation after customer response merge
+                    # Don't treat as duplicate
+                    is_duplicate = False
+                    self.logger.info(f"Duplicate flag cleared: order was re-validated after customer response")
+                else:
+                    validation_results.append({
+                        "field_name": "_duplicate",
+                        "rule_name": "duplicate_detection",
+                        "status": "warning",
+                        "message": "Potential duplicate order detected",
+                    })
 
         # Persist validation results (clear old results first)
         async with async_session_factory() as session:
@@ -107,12 +118,34 @@ class ValidationAgent(BaseAgent):
         has_missing = len(missing_mandatory) > 0
         is_hazmat = bool(order_row.get("hazmat_indicator"))
 
+        # Smart routing for missing fields:
+        # - If a missing field has confidence = 0 (LLM didn't find it at all) → truly missing → email customer
+        # - If a missing field has confidence > 0 (LLM saw something but DB column is empty) → format mismatch → HITL
+        # Only override has_missing when ALL missing fields have non-zero confidence (ambiguous case)
+        if has_missing and overall_confidence >= 80:
+            truly_missing = [
+                f for f in missing_mandatory
+                if confidence_scores.get(f, 0) == 0
+            ]
+            if truly_missing:
+                # There are genuinely missing fields → always email customer (don't let HITL range override)
+                has_missing = True
+            else:
+                # All "missing" fields have some confidence — extraction format issue → HITL
+                has_missing = False
+
         route = route_by_confidence(
             overall_confidence=overall_confidence,
             has_missing_mandatory=has_missing,
             is_duplicate=is_duplicate,
             is_hazmat=is_hazmat,
             customer_always_hitl=customer_always_hitl,
+        )
+
+        self.logger.info(
+            f"Routing decision: has_missing={has_missing}, confidence={overall_confidence:.1f}%, "
+            f"is_hazmat={is_hazmat}, is_duplicate={is_duplicate}, "
+            f"missing_fields={missing_mandatory}, target={route.target_queue}"
         )
 
         # Determine processing mode
@@ -336,7 +369,8 @@ class ValidationAgent(BaseAgent):
     async def _check_duplicate(self, order: Any) -> bool:
         """Check for duplicate orders within the detection window.
 
-        Matches by: customer_name + pickup_date + delivery postal code within window.
+        Matches by: customer_name + pickup_date within window.
+        Also matches by: customer_name + same commodity within a shorter window (1 hour).
         Falls back to customer_name if customer_id is not set.
         """
         import os
@@ -345,72 +379,107 @@ class ValidationAgent(BaseAgent):
         customer_id = order.get("customer_id")
         customer_name = order.get("customer_name")
         pickup_date = order.get("pickup_date")
+        commodity = order.get("commodity")
         delivery_address = order.get("delivery_address")
 
-        # Need at least customer identifier + pickup date
-        if not pickup_date:
-            return False
+        # Need at least customer identifier
         if not customer_id and not customer_name:
             return False
 
-        # Extract delivery postal code
-        delivery_postal = None
-        if delivery_address:
-            if isinstance(delivery_address, str):
-                try:
-                    addr = json.loads(delivery_address)
-                    delivery_postal = addr.get("postal_code")
-                except json.JSONDecodeError:
-                    pass
-            elif isinstance(delivery_address, dict):
-                delivery_postal = delivery_address.get("postal_code")
-
         cutoff = datetime.now(timezone.utc) - timedelta(hours=window_hours)
+        short_cutoff = datetime.now(timezone.utc) - timedelta(hours=1)
+        order_id = str(order.get("id", ""))
 
         async with async_session_factory() as session:
-            # Match by customer_id if available, otherwise by customer_name
-            if customer_id:
-                query = """
-                    SELECT COUNT(*) FROM orders
-                    WHERE customer_id = :customer_match
-                    AND pickup_date = :pickup_date
-                    AND created_at > :cutoff
-                    AND id != :order_id
-                    AND status != 'cancelled'
-                """
-                params = {
-                    "customer_match": str(customer_id),
-                    "pickup_date": pickup_date,
-                    "cutoff": cutoff,
-                    "order_id": str(order.get("id", "")),
-                }
-            else:
-                query = """
-                    SELECT COUNT(*) FROM orders
-                    WHERE LOWER(customer_name) = LOWER(:customer_match)
-                    AND pickup_date = :pickup_date
-                    AND created_at > :cutoff
-                    AND id != :order_id
-                    AND status != 'cancelled'
-                """
-                params = {
-                    "customer_match": customer_name,
-                    "pickup_date": pickup_date,
-                    "cutoff": cutoff,
-                    "order_id": str(order.get("id", "")),
-                }
+            # Strategy 1: Same customer + same pickup date within window
+            if pickup_date:
+                if customer_id:
+                    query = """
+                        SELECT COUNT(*) FROM orders
+                        WHERE customer_id = :customer_match
+                        AND pickup_date = :pickup_date
+                        AND created_at > :cutoff
+                        AND id != :order_id
+                        AND source_email_id != :source_email_id
+                        AND status != 'cancelled'
+                    """
+                    params: dict = {
+                        "customer_match": str(customer_id),
+                        "pickup_date": pickup_date,
+                        "cutoff": cutoff,
+                        "order_id": order_id,
+                        "source_email_id": str(order.get("source_email_id") or ""),
+                    }
+                else:
+                    query = """
+                        SELECT COUNT(*) FROM orders
+                        WHERE LOWER(customer_name) = LOWER(:customer_match)
+                        AND pickup_date = :pickup_date
+                        AND created_at > :cutoff
+                        AND id != :order_id
+                        AND (source_email_id IS NULL OR source_email_id != :source_email_id)
+                        AND status != 'cancelled'
+                    """
+                    params = {
+                        "customer_match": customer_name,
+                        "pickup_date": pickup_date,
+                        "cutoff": cutoff,
+                        "order_id": order_id,
+                        "source_email_id": str(order.get("source_email_id") or ""),
+                    }
 
-            # If we have delivery postal code, add it as an extra match condition
-            if delivery_postal:
-                query = query.replace(
-                    "AND status != 'cancelled'",
-                    "AND delivery_address->>'postal_code' = :postal AND status != 'cancelled'"
+                # Add delivery postal code if available
+                delivery_postal = None
+                if delivery_address:
+                    if isinstance(delivery_address, str):
+                        try:
+                            addr = json.loads(delivery_address)
+                            delivery_postal = addr.get("postal_code")
+                        except json.JSONDecodeError:
+                            pass
+                    elif isinstance(delivery_address, dict):
+                        delivery_postal = delivery_address.get("postal_code")
+
+                if delivery_postal:
+                    query = query.replace(
+                        "AND status != 'cancelled'",
+                        "AND delivery_address->>'postal_code' = :postal AND status != 'cancelled'"
+                    )
+                    params["postal"] = delivery_postal
+
+                result = await session.execute(text(query), params)
+                count = result.scalar()
+                if (count or 0) > 0:
+                    return True
+
+            # Strategy 2: Same customer + very similar commodity + same pickup date within 1 hour
+            # (catches resends of the exact same email)
+            if commodity and customer_name and pickup_date:
+                result = await session.execute(
+                    text("""
+                        SELECT COUNT(*) FROM orders
+                        WHERE LOWER(customer_name) = LOWER(:customer_name)
+                        AND LOWER(commodity) = LOWER(:commodity)
+                        AND pickup_date = :pickup_date
+                        AND created_at > :short_cutoff
+                        AND id != :order_id
+                        AND (source_email_id IS NULL OR source_email_id != :source_email_id)
+                        AND status != 'cancelled'
+                    """),
+                    {
+                        "customer_name": customer_name,
+                        "commodity": commodity,
+                        "pickup_date": pickup_date,
+                        "short_cutoff": short_cutoff,
+                        "order_id": order_id,
+                        "source_email_id": str(order.get("source_email_id") or ""),
+                    },
                 )
-                params["postal"] = delivery_postal
+                count = result.scalar()
+                if (count or 0) > 0:
+                    return True
 
-            result = await session.execute(text(query), params)
-            count = result.scalar()
-            return (count or 0) > 0
+        return False
 
     def _get_status_for_route(self, target_queue: str, has_missing: bool) -> str:
         """Map routing target to order status."""

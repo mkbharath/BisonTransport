@@ -106,17 +106,11 @@ def route_by_confidence(
         )
 
     if has_missing_mandatory:
-        if overall_confidence >= auto_comm:
-            return ConfidenceRoute(
-                target_queue="communication",
-                reason=f"Missing mandatory fields; confidence {overall_confidence:.1f}% >= auto-comm threshold {auto_comm}%",
-            )
-        else:
-            return ConfidenceRoute(
-                target_queue="hitl",
-                hitl_queue_type="validation_failure",
-                reason=f"Missing mandatory fields; confidence {overall_confidence:.1f}% below auto-comm threshold",
-            )
+        # Always auto-email customer when mandatory fields are missing
+        return ConfidenceRoute(
+            target_queue="communication",
+            reason=f"Missing mandatory fields; auto-emailing customer (confidence {overall_confidence:.1f}%)",
+        )
 
     if overall_confidence >= human_review:
         return ConfidenceRoute(

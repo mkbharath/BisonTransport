@@ -30,7 +30,34 @@ Return a JSON object with two top-level keys:
 1. "order": containing all extracted fields
 2. "confidence_scores": containing a confidence score (0-100) for each field
 
-Order fields to extract:
+IMPORTANT FIELD DEFINITIONS:
+
+ADDRESSES - Extract each component separately:
+- pickup_address_line1: street address (e.g., "45 MIDC Industrial Area")
+- pickup_city: city name (e.g., "Pune")
+- pickup_state: state/province code (e.g., "MH", "KA", "ON", "BC")
+- pickup_postal_code: postal/zip code (e.g., "411026", "560066")
+- pickup_country: country (e.g., "India", "Canada")
+- Same for delivery_address_line1, delivery_city, delivery_state, delivery_postal_code, delivery_country
+
+EQUIPMENT TYPE vs FREIGHT TYPE - These are DIFFERENT fields:
+- freight_type: the shipping mode. MUST be one of: ftl, ltl, partial, intermodal
+  - FTL = Full Truck Load, LTL = Less Than Truck Load
+- equipment_type: the TYPE OF VEHICLE/TRAILER. MUST be one of: dry_van, flatbed, reefer, step_deck, tanker, lowboy, conestoga, other
+  - "Dry Van" = enclosed trailer for general cargo
+  - "Flatbed" = open trailer for heavy/oversized items like steel, lumber, machinery
+  - "Reefer" = refrigerated trailer for temperature-sensitive goods
+  - "Tanker" = for liquids/chemicals
+  - If the text says "Dry Van" or "enclosed", use "dry_van"
+  - If the text says "Flatbed" or "open trailer", use "flatbed"
+  - If the text says "Reefer" or "refrigerated", use "reefer"
+  - If not explicitly stated, infer from commodity: steel/lumber → flatbed, food/dairy → reefer, general goods → dry_van
+  - NEVER put freight type values (FTL, LTL) in equipment_type
+
+PALLETS:
+- num_pallets: number of pallets. Extract even if written as "12 pallets" or "pallets: 12"
+
+All fields to extract:
 - customer_name, contact_name, contact_email, contact_phone
 - pickup_location_name, pickup_address_line1, pickup_city, pickup_state, pickup_postal_code, pickup_country, pickup_date, pickup_time_start, pickup_time_end, pickup_instructions
 - delivery_location_name, delivery_address_line1, delivery_city, delivery_state, delivery_postal_code, delivery_country, delivery_date, delivery_time_start, delivery_time_end, delivery_instructions
@@ -47,6 +74,8 @@ Rules:
 - Normalize dates to YYYY-MM-DD format
 - Normalize weight units: pounds/lbs -> "lbs", kilograms/kgs/kg -> "kgs"
 - For boolean fields, use true/false
+- ALWAYS extract address components separately (line1, city, state, postal_code, country)
+- NEVER confuse freight_type with equipment_type
 - Return ONLY valid JSON, no other text"""
 
 
@@ -428,7 +457,7 @@ Return ONLY valid JSON.""",
                 existing_addr = json.loads(existing_addr)
             existing_addr.update(pickup_addr_updates)
             params["pickup_address"] = json.dumps(existing_addr)
-            update_parts.append("pickup_address = :pickup_address::jsonb")
+            update_parts.append("pickup_address = CAST(:pickup_address AS jsonb)")
 
         if delivery_addr_updates:
             existing_addr = order.get("delivery_address") or {}
@@ -436,7 +465,7 @@ Return ONLY valid JSON.""",
                 existing_addr = json.loads(existing_addr)
             existing_addr.update(delivery_addr_updates)
             params["delivery_address"] = json.dumps(existing_addr)
-            update_parts.append("delivery_address = :delivery_address::jsonb")
+            update_parts.append("delivery_address = CAST(:delivery_address AS jsonb)")
 
         if not update_parts:
             self.logger.info(f"No updatable fields extracted from customer response")
