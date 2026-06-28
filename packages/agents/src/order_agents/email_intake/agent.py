@@ -36,6 +36,8 @@ Categories:
 
 IMPORTANT: If the subject line contains "Re:" AND references "Action Required" or "Missing Information" or an order number like "ORD-XXXXXXXX-XXXXX", classify as customer_response, NOT order_update.
 
+IMPORTANT: If the email has file attachments (PDF, Excel, Word) and the body mentions "attached", "shipment", "order", "rate confirmation", or "please process", classify as new_order — the order details are in the attachment.
+
 Respond with JSON: {"category": "<category>", "confidence": <0-100>}"""
 
 
@@ -146,10 +148,18 @@ class EmailIntakeAgent:
                 adapters = get_adapters()
                 body_text = email_record["body_text"] or _strip_html(email_record["body_html"]) or ""
                 snippet = body_text[:500]
+
+                # Add attachment context to help classification
+                has_attachments = email_record.get("has_attachments", False)
+                attachment_hint = ""
+                if has_attachments:
+                    attachment_hint = "\nNote: This email has file attachments (likely PDF/Excel with order details)."
+
                 classification_input = (
                     f"Subject: {email_record['subject']}\n"
                     f"From: {email_record['from_address']}\n"
                     f"Body:\n{snippet}"
+                    f"{attachment_hint}"
                 )
 
                 classification, confidence = await adapters.llm.classify(
