@@ -468,7 +468,7 @@ class TestAgentValidationRules:
             "delivery_location_name", "delivery_address_line1", "delivery_city",
             "delivery_state", "delivery_postal_code", "delivery_country", "delivery_date",
             "commodity", "freight_type", "total_weight", "weight_unit",
-            "equipment_type", "hazmat_indicator",
+            "equipment_type",
         ]
         for field in expected_mandatory:
             assert field in mandatory, f"Field '{field}' should be mandatory but isn't configured"

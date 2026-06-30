@@ -54,8 +54,17 @@ class EmailTemplateRequest(BaseModel):
 class UserRequest(BaseModel):
     email: str
     name: str
+    password: str | None = None
     role: str
     active: bool = True
+
+
+class UserUpdateRequest(BaseModel):
+    email: str | None = None
+    name: str | None = None
+    password: str | None = None
+    role: str | None = None
+    active: bool | None = None
 
 
 # --- Field Configurations ---
@@ -331,8 +340,9 @@ async def create_user(
     import hashlib
 
     user_id = str(uuid.uuid4())
-    # Default password for new users (they should change it)
-    default_hash = hashlib.sha256("changeme".encode()).hexdigest()
+    # Hash the provided password, or default to "changeme" if not provided
+    password = body.password or "changeme"
+    password_hash = hashlib.sha256(password.encode()).hexdigest()
 
     async with async_session_factory() as session:
         await session.execute(
@@ -340,7 +350,14 @@ async def create_user(
                 INSERT INTO users (id, email, name, role, active, password_hash, created_at)
                 VALUES (:id, :email, :name, :role, :active, :password_hash, NOW())
             """),
-            {"id": user_id, "password_hash": default_hash, **body.model_dump()},
+            {
+                "id": user_id,
+                "email": body.email,
+                "name": body.name,
+                "role": body.role,
+                "active": body.active,
+                "password_hash": password_hash,
+            },
         )
         await session.commit()
         result = await session.execute(
@@ -354,16 +371,35 @@ async def create_user(
 @router.patch("/users/{user_id}")
 async def update_user(
     user_id: str,
-    body: UserRequest,
+    body: UserUpdateRequest,
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
+    import hashlib
+
+    updates = []
+    params: dict = {"id": user_id}
+
+    for field, value in body.model_dump(exclude_unset=True).items():
+        if field == "password" and value is not None:
+            # Hash the new password
+            updates.append("password_hash = :password_hash")
+            params["password_hash"] = hashlib.sha256(value.encode()).hexdigest()
+        elif field != "password":
+            updates.append(f"{field} = :{field}")
+            params[field] = value
+
+    if not updates:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": {"code": "BAD_REQUEST", "message": "No fields to update"}},
+        )
+
+    set_clause = ", ".join(updates)
+
     async with async_session_factory() as session:
         result = await session.execute(
-            text("""
-                UPDATE users SET email = :email, name = :name, role = :role, active = :active
-                WHERE id = :id RETURNING id
-            """),
-            {"id": user_id, **body.model_dump()},
+            text(f"UPDATE users SET {set_clause} WHERE id = :id RETURNING id"),
+            params,
         )
         if not result.first():
             raise HTTPException(status_code=404, detail={"error": {"code": "NOT_FOUND", "message": "User not found"}})

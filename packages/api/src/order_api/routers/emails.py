@@ -125,6 +125,16 @@ async def get_attachment_url(
     current_user: CurrentUser = Depends(get_current_user),
 ):
     """Get a presigned URL for downloading an attachment."""
+    # Validate UUID format
+    try:
+        uuid.UUID(email_id)
+        uuid.UUID(attachment_id)
+    except (ValueError, AttributeError):
+        raise HTTPException(
+            status_code=404,
+            detail={"error": {"code": "NOT_FOUND", "message": "Attachment not found"}},
+        )
+
     async with async_session_factory() as session:
         result = await session.execute(
             text("""
