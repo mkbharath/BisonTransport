@@ -51,3 +51,7 @@ redis-data/
 htmlcov/
 .coverage
 coverage.xml
+
+# Playwright
+packages/frontend/test-results/
+packages/frontend/playwright-report/

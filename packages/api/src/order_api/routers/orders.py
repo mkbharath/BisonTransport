@@ -23,14 +23,24 @@ router = APIRouter(prefix="/api/v1/orders", tags=["orders"])
 class OrderCreateRequest(BaseModel):
     customer_id: str | None = None
     customer_name: str | None = None
+    contact_name: str | None = None
+    contact_email: str | None = None
+    contact_phone: str | None = None
+    pickup_location_name: str | None = None
     pickup_address: dict | None = None
     pickup_date: str | None = None
+    delivery_location_name: str | None = None
     delivery_address: dict | None = None
     delivery_date: str | None = None
     commodity: str | None = None
+    freight_type: str | None = None
     equipment_type: str | None = None
     total_weight: float | None = None
     weight_unit: str | None = None
+    num_pallets: int | None = None
+    hazmat_indicator: bool = False
+    hazmat_un_number: str | None = None
+    hazmat_class: str | None = None
     notes: str | None = None
 
 
@@ -134,27 +144,43 @@ async def create_order(
         await session.execute(
             text("""
                 INSERT INTO orders (id, order_number, customer_id, customer_name,
-                    pickup_address, pickup_date, delivery_address, delivery_date,
-                    commodity, equipment_type, total_weight, weight_unit, notes,
-                    status, processing_mode, created_at)
+                    contact_name, contact_email, contact_phone,
+                    pickup_location_name, pickup_address, pickup_date,
+                    delivery_location_name, delivery_address, delivery_date,
+                    commodity, freight_type, equipment_type, total_weight, weight_unit,
+                    num_pallets, hazmat_indicator, hazmat_un_number, hazmat_class,
+                    notes, status, processing_mode, created_at)
                 VALUES (:id, :order_number, :customer_id, :customer_name,
-                    :pickup_address::jsonb, :pickup_date, :delivery_address::jsonb, :delivery_date,
-                    :commodity, :equipment_type, :total_weight, :weight_unit, :notes,
-                    'extracted', 'manual', NOW())
+                    :contact_name, :contact_email, :contact_phone,
+                    :pickup_location_name, CAST(:pickup_address AS jsonb), :pickup_date,
+                    :delivery_location_name, CAST(:delivery_address AS jsonb), :delivery_date,
+                    :commodity, :freight_type, :equipment_type, :total_weight, :weight_unit,
+                    :num_pallets, :hazmat_indicator, :hazmat_un_number, :hazmat_class,
+                    :notes, 'order_created', 'manual_entry', NOW())
             """),
             {
                 "id": order_id,
                 "order_number": order_number,
                 "customer_id": body.customer_id,
                 "customer_name": body.customer_name,
+                "contact_name": body.contact_name,
+                "contact_email": body.contact_email,
+                "contact_phone": body.contact_phone,
+                "pickup_location_name": getattr(body, 'pickup_location_name', None),
                 "pickup_address": _json_or_none(body.pickup_address),
-                "pickup_date": body.pickup_date,
+                "pickup_date": _parse_date_str(body.pickup_date),
+                "delivery_location_name": getattr(body, 'delivery_location_name', None),
                 "delivery_address": _json_or_none(body.delivery_address),
-                "delivery_date": body.delivery_date,
+                "delivery_date": _parse_date_str(body.delivery_date),
                 "commodity": body.commodity,
+                "freight_type": getattr(body, 'freight_type', None),
                 "equipment_type": body.equipment_type,
                 "total_weight": body.total_weight,
                 "weight_unit": body.weight_unit,
+                "num_pallets": getattr(body, 'num_pallets', None),
+                "hazmat_indicator": getattr(body, 'hazmat_indicator', False),
+                "hazmat_un_number": getattr(body, 'hazmat_un_number', None),
+                "hazmat_class": getattr(body, 'hazmat_class', None),
                 "notes": body.notes,
             },
         )
@@ -164,6 +190,24 @@ async def create_order(
             text("SELECT * FROM orders WHERE id = :id"), {"id": order_id}
         )
         order = dict(result.mappings().first())
+
+    # Send confirmation email for manual orders
+    if body.contact_email:
+        try:
+            adapters = get_adapters()
+            from order_shared.adapters.base import EmailMessage
+            customer_name = body.customer_name or "Customer"
+            email_msg = EmailMessage(
+                to=body.contact_email,
+                subject=f"Order Confirmed: {order_number}",
+                body_html=f"<p>Dear {customer_name},</p><p>Your transportation order has been successfully created.</p><p><strong>Order Number:</strong> {order_number}<br><strong>Pickup Date:</strong> {body.pickup_date or 'TBD'}<br><strong>Delivery Date:</strong> {body.delivery_date or 'TBD'}<br><strong>Equipment:</strong> {body.equipment_type or 'N/A'}</p><p>Best regards,<br>Order Processing Team</p>",
+                body_text=f"Dear {customer_name},\n\nYour order has been confirmed.\n\nOrder Number: {order_number}\nPickup Date: {body.pickup_date or 'TBD'}\nDelivery Date: {body.delivery_date or 'TBD'}\nEquipment: {body.equipment_type or 'N/A'}\n\nBest regards,\nOrder Processing Team",
+            )
+            print(f"[ORDER-API] Sending confirmation email to {body.contact_email} for {order_number}...")
+            await adapters.email.send_email(email_msg)
+            print(f"[ORDER-API] Confirmation email SENT to {body.contact_email}")
+        except Exception as e:
+            print(f"[ORDER-API] FAILED to send confirmation email to {body.contact_email}: {type(e).__name__}: {e}")
 
     return _serialize_row(order)
 
@@ -196,8 +240,11 @@ async def update_order(
 
     for field, value in body.model_dump(exclude_unset=True).items():
         if field in ("pickup_address", "delivery_address") and value is not None:
-            updates.append(f"{field} = :{field}::jsonb")
+            updates.append(f"{field} = CAST(:{field} AS jsonb)")
             params[field] = _json_or_none(value)
+        elif field in ("pickup_date", "delivery_date"):
+            updates.append(f"{field} = :{field}")
+            params[field] = _parse_date_str(value) if isinstance(value, str) else value
         else:
             updates.append(f"{field} = :{field}")
             params[field] = value
@@ -488,6 +535,17 @@ def _json_or_none(value: dict | None) -> str | None:
     if value is None:
         return None
     return json.dumps(value)
+
+
+def _parse_date_str(value: str | None):
+    """Convert date string to Python date object for asyncpg."""
+    if not value:
+        return None
+    from datetime import date as date_type
+    try:
+        return date_type.fromisoformat(value)
+    except (ValueError, TypeError):
+        return None
 
 
 def _serialize_row(row: dict) -> dict:

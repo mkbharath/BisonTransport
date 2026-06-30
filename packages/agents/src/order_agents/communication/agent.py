@@ -5,6 +5,7 @@ sends via SMTP (MailHog locally), and tracks conversations.
 """
 
 import json
+import os
 import uuid
 from datetime import datetime, timezone
 from typing import Any
@@ -28,7 +29,13 @@ class CommunicationAgent(BaseAgent):
         adapters = get_adapters()
         email_id = message.body["email_id"]
         order_id = message.body["order_id"]
+        action = message.body.get("action", "missing_info")
         missing_fields = message.body.get("missing_fields", [])
+
+        # Handle follow-up action
+        if action == "follow_up":
+            await self._handle_follow_up(message)
+            return
 
         if not missing_fields:
             self.logger.info(f"No missing fields for order {order_id}, skipping communication")
@@ -136,6 +143,166 @@ class CommunicationAgent(BaseAgent):
             f"Missing-info email sent to {customer_email_addr} for order {order_number} "
             f"({len(field_labels)} missing fields)"
         )
+
+        # Schedule follow-up reminder after configured delay
+        follow_up_hours = int(os.environ.get("FOLLOWUP_DELAY_HOURS", "24"))
+        # For local dev, use a much shorter delay (2 minutes) for testing
+        # In production, this would be the full 24h delay via SQS DelaySeconds
+        delay_seconds = min(follow_up_hours * 3600, 900)  # Max 900s (15min) for ElasticMQ
+        await adapters.queue.publish_message(
+            queue_name="communication",
+            body={
+                "email_id": email_id,
+                "order_id": order_id,
+                "action": "follow_up",
+                "missing_fields": missing_fields,
+                "attempt": 1,
+            },
+            delay_seconds=delay_seconds,
+        )
+        self.logger.info(
+            f"Follow-up scheduled in {delay_seconds}s for order {order_id}"
+        )
+
+    async def _handle_follow_up(self, message: QueueMessage) -> None:
+        """Handle a scheduled follow-up: if order still awaiting_customer, send reminder."""
+        adapters = get_adapters()
+        order_id = message.body["order_id"]
+        email_id = message.body["email_id"]
+        missing_fields = message.body.get("missing_fields", [])
+        attempt = message.body.get("attempt", 1)
+        max_attempts = 2  # Original + 1 follow-up
+
+        # Check if order is still awaiting customer
+        async with async_session_factory() as session:
+            result = await session.execute(
+                text("SELECT order_number, customer_name, contact_email, status FROM orders WHERE id = :id"),
+                {"id": order_id},
+            )
+            order_row = result.fetchone()
+
+        if not order_row:
+            self.logger.info(f"Follow-up: order {order_id} not found, skipping")
+            return
+
+        order_number, customer_name, contact_email, status = order_row
+
+        if status != "awaiting_customer":
+            self.logger.info(
+                f"Follow-up: order {order_number} no longer awaiting customer (status={status}), skipping"
+            )
+            return
+
+        if not contact_email:
+            self.logger.warning(f"Follow-up: no contact email for order {order_number}")
+            return
+
+        if attempt > max_attempts:
+            # Escalate to HITL after max follow-ups
+            async with async_session_factory() as session:
+                await session.execute(
+                    text("UPDATE orders SET status = 'pending_review', updated_at = NOW() WHERE id = :id"),
+                    {"id": order_id},
+                )
+                await session.execute(
+                    text("""
+                        INSERT INTO order_history (id, order_id, event_type, previous_status, new_status, triggered_by, actor_id, detail_json, created_at)
+                        VALUES (:id, :order_id, 'customer_timeout_escalation', 'awaiting_customer', 'pending_review', 'agent', :agent, :detail, NOW())
+                    """),
+                    {
+                        "id": str(uuid.uuid4()),
+                        "order_id": order_id,
+                        "agent": self.agent_type,
+                        "detail": json.dumps({"reason": "Customer did not respond after follow-up", "attempts": attempt}),
+                    },
+                )
+                await session.commit()
+            self.logger.info(f"Follow-up: order {order_number} escalated to HITL after {attempt} attempts")
+            return
+
+        # Get original email message_id for threading
+        original_message_id = None
+        async with async_session_factory() as session:
+            result = await session.execute(
+                text("SELECT message_id FROM emails WHERE id = :id"),
+                {"id": email_id},
+            )
+            row = result.fetchone()
+            if row:
+                original_message_id = row[0]
+
+        # Resolve field labels
+        field_labels = await self._get_field_labels(missing_fields)
+        fields_list = ", ".join(field_labels)
+
+        # Send follow-up email
+        html_body = f"""<p>Dear {customer_name or 'Customer'},</p>
+<p>This is a friendly reminder regarding your transportation order <strong>{order_number}</strong>.</p>
+<p>We are still awaiting the following information to proceed:</p>
+<ul>{"".join(f"<li>{label}</li>" for label in field_labels)}</ul>
+<p>Please reply to this email with the missing details at your earliest convenience.</p>
+<p>If we do not receive a response within 24 hours, this order will be escalated for manual review.</p>
+<p>Best regards,<br>Order Processing Team</p>"""
+
+        text_body = f"""Dear {customer_name or 'Customer'},
+
+This is a friendly reminder regarding your order {order_number}.
+
+We still need: {fields_list}
+
+Please reply with the missing details.
+
+If no response within 24 hours, this order will be escalated.
+
+Best regards,
+Order Processing Team"""
+
+        email_msg = EmailMessage(
+            to=contact_email,
+            subject=f"Reminder: Missing Information for Order {order_number}",
+            body_html=html_body,
+            body_text=text_body,
+            in_reply_to=original_message_id,
+            references=[original_message_id] if original_message_id else [],
+        )
+
+        await adapters.email.send_email(email_msg)
+
+        # Log the follow-up
+        async with async_session_factory() as session:
+            await session.execute(
+                text("""
+                    INSERT INTO order_history (id, order_id, event_type, new_status, triggered_by, actor_id, detail_json, created_at)
+                    VALUES (:id, :order_id, 'follow_up_sent', 'awaiting_customer', 'agent', :agent, :detail, NOW())
+                """),
+                {
+                    "id": str(uuid.uuid4()),
+                    "order_id": order_id,
+                    "agent": self.agent_type,
+                    "detail": json.dumps({"attempt": attempt, "sent_to": contact_email}),
+                },
+            )
+            await session.commit()
+
+        self.logger.info(
+            f"Follow-up #{attempt} sent to {contact_email} for order {order_number}"
+        )
+
+        # Schedule next follow-up (escalation) if this was attempt 1
+        if attempt < max_attempts:
+            follow_up_hours = int(os.environ.get("FOLLOWUP_DELAY_HOURS", "24"))
+            delay_seconds = min(follow_up_hours * 3600, 900)
+            await adapters.queue.publish_message(
+                queue_name="communication",
+                body={
+                    "email_id": email_id,
+                    "order_id": order_id,
+                    "action": "follow_up",
+                    "missing_fields": missing_fields,
+                    "attempt": attempt + 1,
+                },
+                delay_seconds=delay_seconds,
+            )
 
     async def _get_field_labels(self, field_names: list[str]) -> list[str]:
         """Resolve field names to human-readable labels."""

@@ -94,3 +94,54 @@ async def get_dashboard(current_user: CurrentUser = Depends(get_current_user)):
         "avg_e2e_time": avg_e2e_time,
         "extraction_accuracy": extraction_accuracy,
     }
+
+
+@router.get("/stp-trend")
+async def get_stp_trend(
+    days: int = 7,
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """STP rate trend over the last N days."""
+    async with async_session_factory() as session:
+        result = await session.execute(
+            text("""
+                SELECT
+                    d.day::date as date,
+                    COALESCE(total.cnt, 0) as total_orders,
+                    COALESCE(stp.cnt, 0) as auto_processed,
+                    CASE WHEN COALESCE(total.cnt, 0) > 0
+                        THEN ROUND((COALESCE(stp.cnt, 0)::numeric / total.cnt) * 100, 1)
+                        ELSE 0
+                    END as stp_rate
+                FROM generate_series(
+                    NOW() - INTERVAL '1 day' * :days,
+                    NOW(),
+                    '1 day'
+                ) d(day)
+                LEFT JOIN LATERAL (
+                    SELECT COUNT(*) as cnt FROM orders
+                    WHERE created_at::date = d.day::date
+                    AND status != 'cancelled'
+                ) total ON true
+                LEFT JOIN LATERAL (
+                    SELECT COUNT(*) as cnt FROM orders
+                    WHERE created_at::date = d.day::date
+                    AND processing_mode = 'auto'
+                    AND status = 'order_created'
+                ) stp ON true
+                ORDER BY d.day ASC
+            """),
+            {"days": days},
+        )
+        rows = result.fetchall()
+
+    trend = []
+    for row in rows:
+        trend.append({
+            "date": row[0].isoformat() if row[0] else None,
+            "total_orders": int(row[1]),
+            "auto_processed": int(row[2]),
+            "stp_rate": float(row[3]),
+        })
+
+    return {"data": trend, "days": days}

@@ -1,9 +1,10 @@
 """Admin endpoints — field configs, business rules, email templates, users."""
 
+import math
 import uuid
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy import text
 
@@ -65,6 +66,17 @@ async def list_field_configs(current_user: CurrentUser = Depends(require_role("a
     async with async_session_factory() as session:
         result = await session.execute(
             text("SELECT * FROM field_configurations ORDER BY display_order ASC NULLS LAST")
+        )
+        rows = [dict(r._mapping) for r in result]
+    return {"data": _serialize_rows(rows)}
+
+
+@router.get("/field-configs/active")
+async def list_active_field_configs(current_user: CurrentUser = Depends(require_role("agent"))):
+    """Get active field configurations for form rendering (agent+ accessible)."""
+    async with async_session_factory() as session:
+        result = await session.execute(
+            text("SELECT * FROM field_configurations WHERE active = true ORDER BY display_order ASC NULLS LAST")
         )
         rows = [dict(r._mapping) for r in result]
     return {"data": _serialize_rows(rows)}
@@ -378,6 +390,81 @@ async def delete_user(
             raise HTTPException(status_code=404, detail={"error": {"code": "NOT_FOUND", "message": "User not found"}})
         await session.commit()
     return None
+
+
+# --- Audit Logs ---
+
+
+@router.get("/audit-logs")
+async def list_audit_logs(
+    page: int = Query(1, ge=1),
+    limit: int = Query(50, ge=1, le=200),
+    search: str | None = None,
+    actor_type: str | None = None,
+    date_from: str | None = None,
+    date_to: str | None = None,
+    tab: str | None = None,
+    current_user: CurrentUser = Depends(require_role("agent")),
+):
+    """List combined audit logs from order_history table."""
+    offset = (page - 1) * limit
+    params: dict = {"limit": limit, "offset": offset}
+
+    conditions: list[str] = []
+    if search:
+        conditions.append(
+            "(event_type ILIKE :search OR actor_id ILIKE :search OR triggered_by ILIKE :search)"
+        )
+        params["search"] = f"%{search}%"
+    if actor_type and actor_type != "all":
+        conditions.append("triggered_by = :actor_type")
+        params["actor_type"] = actor_type
+    if date_from:
+        conditions.append("created_at >= :date_from::timestamptz")
+        params["date_from"] = date_from
+    if date_to:
+        conditions.append("created_at <= :date_to::timestamptz")
+        params["date_to"] = date_to
+    if tab and tab != "all":
+        if tab == "agent_actions":
+            conditions.append("triggered_by = 'agent'")
+        elif tab == "user_actions":
+            conditions.append("triggered_by = 'user'")
+        elif tab == "order_history":
+            conditions.append("event_type ILIKE '%status%'")
+        elif tab == "validations":
+            conditions.append("event_type ILIKE '%valid%'")
+
+    where_clause = " AND ".join(conditions) if conditions else "1=1"
+
+    async with async_session_factory() as session:
+        count_result = await session.execute(
+            text(f"SELECT COUNT(*) FROM order_history WHERE {where_clause}"), params
+        )
+        total_count = count_result.scalar() or 0
+
+        result = await session.execute(
+            text(f"""
+                SELECT id, created_at as timestamp, triggered_by as actor_type,
+                    actor_id, event_type as action, 'order' as entity_type,
+                    order_id as entity_id, previous_status, new_status, detail_json
+                FROM order_history
+                WHERE {where_clause}
+                ORDER BY created_at DESC
+                LIMIT :limit OFFSET :offset
+            """),
+            params,
+        )
+        rows = [dict(r._mapping) for r in result]
+
+    total_pages = math.ceil(total_count / limit) if total_count > 0 else 1
+    return {
+        "data": _serialize_rows(rows),
+        "total_count": total_count,
+        "total_pages": total_pages,
+        "page": page,
+        "limit": limit,
+    }
 
 
 # --- Helpers ---

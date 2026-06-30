@@ -70,6 +70,10 @@ export async function login(email: string, password: string) {
 }
 
 // --- Orders ---
+export async function createOrder(data: Record<string, unknown>) {
+  return request<any>("/orders", { method: "POST", body: JSON.stringify(data) });
+}
+
 export async function getOrders(params?: Record<string, string | number>) {
   const query = params ? "?" + new URLSearchParams(params as Record<string, string>).toString() : "";
   return request<{ data: any[]; total_count: number; total_pages: number; page: number; limit: number }>(`/orders${query}`);
@@ -77,6 +81,10 @@ export async function getOrders(params?: Record<string, string | number>) {
 
 export async function getOrder(id: string) {
   return request<any>(`/orders/${id}`);
+}
+
+export async function updateOrder(id: string, data: Record<string, unknown>) {
+  return request<any>(`/orders/${id}`, { method: "PATCH", body: JSON.stringify(data) });
 }
 
 export async function approveOrder(id: string) {
@@ -126,6 +134,13 @@ export async function getDashboard() {
   }>("/reports/dashboard");
 }
 
+export async function getStpTrend(days: number = 7) {
+  return request<{
+    data: { date: string; total_orders: number; auto_processed: number; stp_rate: number }[];
+    days: number;
+  }>(`/reports/stp-trend?days=${days}`);
+}
+
 // --- Customers ---
 export async function getCustomers(params?: Record<string, string | number>) {
   const query = params ? "?" + new URLSearchParams(params as Record<string, string>).toString() : "";
@@ -135,4 +150,56 @@ export async function getCustomers(params?: Record<string, string | number>) {
 // --- Health ---
 export async function getHealth() {
   return request<{ status: string; version: string; checks: Record<string, string> }>("/health");
+}
+
+
+// --- Admin: Audit Logs ---
+export async function getAuditLogs(params?: Record<string, string | number>) {
+  const query = params ? "?" + new URLSearchParams(params as Record<string, string>).toString() : "";
+  return request<{ data: any[]; total_count: number; total_pages: number; page: number; limit: number }>(`/admin/audit-logs${query}`);
+}
+
+// --- Admin: Field Configs ---
+export async function getActiveFieldConfigs() {
+  return request<{ data: any[] }>("/admin/field-configs/active");
+}
+export async function getFieldConfigs() {
+  return request<{ data: any[] }>("/admin/field-configs");
+}
+export async function createFieldConfig(data: Record<string, unknown>) {
+  return request<any>("/admin/field-configs", { method: "POST", body: JSON.stringify(data) });
+}
+export async function updateFieldConfig(id: string, data: Record<string, unknown>) {
+  return request<any>(`/admin/field-configs/${id}`, { method: "PATCH", body: JSON.stringify(data) });
+}
+export async function deleteFieldConfig(id: string) {
+  return request<any>(`/admin/field-configs/${id}`, { method: "DELETE" });
+}
+
+// --- Admin: Business Rules ---
+export async function getBusinessRules() {
+  return request<{ data: any[] }>("/admin/business-rules");
+}
+export async function createBusinessRule(data: Record<string, unknown>) {
+  return request<any>("/admin/business-rules", { method: "POST", body: JSON.stringify(data) });
+}
+export async function updateBusinessRule(id: string, data: Record<string, unknown>) {
+  return request<any>(`/admin/business-rules/${id}`, { method: "PATCH", body: JSON.stringify(data) });
+}
+export async function deleteBusinessRule(id: string) {
+  return request<any>(`/admin/business-rules/${id}`, { method: "DELETE" });
+}
+
+// --- Admin: Email Templates ---
+export async function getEmailTemplates() {
+  return request<{ data: any[] }>("/admin/email-templates");
+}
+export async function createEmailTemplate(data: Record<string, unknown>) {
+  return request<any>("/admin/email-templates", { method: "POST", body: JSON.stringify(data) });
+}
+export async function updateEmailTemplate(id: string, data: Record<string, unknown>) {
+  return request<any>(`/admin/email-templates/${id}`, { method: "PATCH", body: JSON.stringify(data) });
+}
+export async function deleteEmailTemplate(id: string) {
+  return request<any>(`/admin/email-templates/${id}`, { method: "DELETE" });
 }
