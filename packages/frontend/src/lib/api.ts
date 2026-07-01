@@ -203,3 +203,17 @@ export async function updateEmailTemplate(id: string, data: Record<string, unkno
 export async function deleteEmailTemplate(id: string) {
   return request<any>(`/admin/email-templates/${id}`, { method: "DELETE" });
 }
+
+// --- Admin: Users ---
+export async function getUsers() {
+  return request<{ data: any[] }>("/admin/users");
+}
+export async function createUser(data: Record<string, unknown>) {
+  return request<any>("/admin/users", { method: "POST", body: JSON.stringify(data) });
+}
+export async function updateUser(id: string, data: Record<string, unknown>) {
+  return request<any>(`/admin/users/${id}`, { method: "PATCH", body: JSON.stringify(data) });
+}
+export async function deleteUser(id: string) {
+  return request<any>(`/admin/users/${id}`, { method: "DELETE" });
+}

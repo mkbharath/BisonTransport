@@ -21,15 +21,20 @@ import {
   createEmailTemplate,
   updateEmailTemplate,
   deleteEmailTemplate,
+  getUsers,
+  createUser,
+  updateUser,
+  deleteUser,
 } from "../lib/api";
 
-type TabKey = "fields" | "rules" | "templates" | "thresholds";
+type TabKey = "fields" | "rules" | "templates" | "thresholds" | "users";
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "fields", label: "Field Configuration" },
   { key: "rules", label: "Business Rules" },
   { key: "templates", label: "Email Templates" },
   { key: "thresholds", label: "Thresholds" },
+  { key: "users", label: "Users" },
 ];
 
 export function AdminPage() {
@@ -63,6 +68,7 @@ export function AdminPage() {
       {activeTab === "rules" && <BusinessRulesTab />}
       {activeTab === "templates" && <EmailTemplatesTab />}
       {activeTab === "thresholds" && <ThresholdsTab />}
+      {activeTab === "users" && <UsersTab />}
     </div>
   );
 }
@@ -715,6 +721,175 @@ function ThresholdInput({ label, value, onChange, unit }: { label: string; value
         />
         <span className="text-sm text-gray-500">{unit}</span>
       </div>
+    </div>
+  );
+}
+
+
+// ─── Users Tab ──────────────────────────────────────────────────────────────
+
+interface User {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+  active: boolean;
+  created_at: string;
+}
+
+const ROLES = ["readonly", "agent", "supervisor", "admin"];
+
+const EMPTY_USER = { email: "", name: "", password: "", role: "agent", active: true };
+
+function UsersTab() {
+  const queryClient = useQueryClient();
+  const [creating, setCreating] = useState(false);
+  const [editing, setEditing] = useState<User | null>(null);
+  const [form, setForm] = useState(EMPTY_USER);
+
+  const { data, isLoading } = useQuery({
+    queryKey: ["admin", "users"],
+    queryFn: getUsers,
+  });
+
+  const createMut = useMutation({
+    mutationFn: (d: Record<string, unknown>) => createUser(d),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["admin", "users"] }); resetForm(); },
+  });
+  const updateMut = useMutation({
+    mutationFn: ({ id, d }: { id: string; d: Record<string, unknown> }) => updateUser(id, d),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ["admin", "users"] }); resetForm(); },
+  });
+  const deleteMut = useMutation({
+    mutationFn: (id: string) => deleteUser(id),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["admin", "users"] }),
+  });
+
+  function resetForm() { setEditing(null); setCreating(false); setForm(EMPTY_USER); }
+
+  function startEdit(user: User) {
+    setCreating(false);
+    setEditing(user);
+    setForm({ email: user.email, name: user.name, password: "", role: user.role, active: user.active });
+  }
+
+  function handleSave() {
+    if (editing) {
+      const payload: Record<string, unknown> = { email: form.email, name: form.name, role: form.role, active: form.active };
+      if (form.password) payload.password = form.password;
+      updateMut.mutate({ id: editing.id, d: payload });
+    } else {
+      createMut.mutate({ email: form.email, name: form.name, password: form.password || "changeme", role: form.role, active: form.active });
+    }
+  }
+
+  const users = (data?.data ?? []) as User[];
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-semibold text-gray-800">User Management</h2>
+        <button
+          onClick={() => { setEditing(null); setCreating(true); setForm(EMPTY_USER); }}
+          className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-amber-500 to-amber-600 rounded-lg hover:from-amber-600 hover:to-amber-700 shadow-sm transition-all"
+        >
+          <Plus className="w-4 h-4" />
+          Add User
+        </button>
+      </div>
+
+      {/* Inline Form */}
+      {(creating || editing) && (
+        <div className="bg-white border border-gray-200 rounded-xl p-5 mb-5 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-sm font-bold text-gray-700">{editing ? "Edit User" : "Add User"}</h3>
+            <button onClick={resetForm} className="p-1 text-gray-400 hover:text-gray-600"><X className="w-4 h-4" /></button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Name</label>
+              <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-amber-400 focus:border-amber-400 outline-none" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Email</label>
+              <input type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-amber-400 focus:border-amber-400 outline-none" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">{editing ? "New Password (leave blank to keep)" : "Password"}</label>
+              <input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} placeholder={editing ? "••••••••" : ""} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-amber-400 focus:border-amber-400 outline-none" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Role</label>
+              <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value })} className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-amber-400 focus:border-amber-400 outline-none bg-white">
+                {ROLES.map((r) => <option key={r} value={r}>{r.charAt(0).toUpperCase() + r.slice(1)}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="flex items-center gap-4 mt-4">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={form.active} onChange={(e) => setForm({ ...form, active: e.target.checked })} className="w-4 h-4 rounded border-gray-300 text-amber-500 focus:ring-amber-400" />
+              <span className="text-sm text-gray-700">Active</span>
+            </label>
+          </div>
+          <div className="flex justify-end mt-5">
+            <button onClick={handleSave} disabled={createMut.isPending || updateMut.isPending} className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-amber-500 to-amber-600 rounded-lg hover:from-amber-600 hover:to-amber-700 shadow-sm transition-all disabled:opacity-50">
+              <Save className="w-4 h-4" />
+              {editing ? "Update" : "Create"}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Table */}
+      {isLoading ? (
+        <div className="space-y-2 animate-pulse">
+          {Array.from({ length: 3 }).map((_, i) => <div key={i} className="h-[48px] bg-gray-100 rounded-lg" />)}
+        </div>
+      ) : (
+        <div className="bg-white rounded-xl border border-gray-200/80 overflow-hidden shadow-sm">
+          <table className="w-full text-[13px]">
+            <thead>
+              <tr className="border-b border-gray-200 bg-gray-50">
+                <th className="px-5 py-3 text-left text-[12px] font-bold text-gray-700 uppercase tracking-wider">Name</th>
+                <th className="px-5 py-3 text-left text-[12px] font-bold text-gray-700 uppercase tracking-wider">Email</th>
+                <th className="px-5 py-3 text-left text-[12px] font-bold text-gray-700 uppercase tracking-wider">Role</th>
+                <th className="px-5 py-3 text-center text-[12px] font-bold text-gray-700 uppercase tracking-wider">Status</th>
+                <th className="px-5 py-3 text-right text-[12px] font-bold text-gray-700 uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {users.map((u) => (
+                <tr key={u.id} className="hover:bg-slate-50/60 transition-colors">
+                  <td className="px-5 py-3 font-medium text-gray-800">{u.name}</td>
+                  <td className="px-5 py-3 text-gray-600">{u.email}</td>
+                  <td className="px-5 py-3">
+                    <span className={`inline-flex px-2 py-0.5 text-[11px] font-semibold rounded-md ${
+                      u.role === "admin" ? "bg-purple-50 text-purple-700" :
+                      u.role === "supervisor" ? "bg-blue-50 text-blue-700" :
+                      u.role === "agent" ? "bg-emerald-50 text-emerald-700" :
+                      "bg-gray-100 text-gray-600"
+                    }`}>
+                      {u.role.charAt(0).toUpperCase() + u.role.slice(1)}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3 text-center">
+                    <span className={`inline-flex px-2 py-0.5 text-[11px] font-semibold rounded-md ${u.active ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>
+                      {u.active ? "Active" : "Inactive"}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3 text-right">
+                    <button onClick={() => startEdit(u)} className="p-1.5 text-gray-400 hover:text-amber-600 rounded transition-colors"><Pencil className="w-3.5 h-3.5" /></button>
+                    <button onClick={() => deleteMut.mutate(u.id)} className="p-1.5 text-gray-400 hover:text-red-600 rounded transition-colors ml-1"><Trash2 className="w-3.5 h-3.5" /></button>
+                  </td>
+                </tr>
+              ))}
+              {users.length === 0 && (
+                <tr><td colSpan={5} className="px-5 py-8 text-center text-gray-400 text-sm">No users configured.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }
