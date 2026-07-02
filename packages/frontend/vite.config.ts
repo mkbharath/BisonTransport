@@ -12,7 +12,7 @@ export default defineConfig({
   server: {
     port: 5173,
     host: "0.0.0.0",
-    allowedHosts: "all",
+    allowedHosts: [".ideyalabs.com", "oia.ideyalabs.com", "localhost", "172.16.6.199"],
     proxy: {
       "/api": {
         target: process.env.VITE_API_URL || "http://localhost:8000",
