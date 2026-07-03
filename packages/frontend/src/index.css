@@ -18,6 +18,16 @@
     height: 5px;
   }
 
+  /* Fix Chrome autofill background on dark login page */
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus {
+    -webkit-box-shadow: 0 0 0 30px rgba(15, 27, 45, 0.95) inset !important;
+    -webkit-text-fill-color: #ffffff !important;
+    caret-color: #ffffff;
+    transition: background-color 5000s ease-in-out 0s;
+  }
+
   ::-webkit-scrollbar-track {
     @apply bg-transparent;
   }
