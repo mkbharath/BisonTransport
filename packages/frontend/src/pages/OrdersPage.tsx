@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams, Link } from "react-router-dom";
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { getOrders } from "../lib/api";
 import { ChevronLeft, ChevronRight, Plus, Search } from "lucide-react";
 
@@ -41,6 +41,24 @@ export function OrdersPage() {
   const page = parseInt(searchParams.get("page") || "1");
   const status = searchParams.get("status") || undefined;
   const [searchTerm, setSearchTerm] = useState(searchParams.get("search") || "");
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>();
+
+  // Debounced search — updates URL params 300ms after user stops typing
+  useEffect(() => {
+    debounceRef.current = setTimeout(() => {
+      const current = searchParams.get("search") || "";
+      if (searchTerm.trim() !== current) {
+        if (searchTerm.trim()) {
+          searchParams.set("search", searchTerm.trim());
+        } else {
+          searchParams.delete("search");
+        }
+        searchParams.set("page", "1");
+        setSearchParams(searchParams);
+      }
+    }, 300);
+    return () => clearTimeout(debounceRef.current);
+  }, [searchTerm]);
 
   const { data, isLoading } = useQuery({
     queryKey: ["orders", page, status, searchParams.get("search")],
@@ -49,13 +67,6 @@ export function OrdersPage() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (searchTerm.trim()) {
-      searchParams.set("search", searchTerm.trim());
-    } else {
-      searchParams.delete("search");
-    }
-    searchParams.set("page", "1");
-    setSearchParams(searchParams);
   };
 
   const setPage = (newPage: number) => {
