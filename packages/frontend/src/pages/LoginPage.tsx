@@ -4,8 +4,8 @@ import { useAuth } from "../hooks/useAuth";
 import { Mail, Lock } from "lucide-react";
 
 export function LoginPage() {
-  const [email, setEmail] = useState("agent@test.com");
-  const [password, setPassword] = useState("agent123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
@@ -102,9 +102,6 @@ export function LoginPage() {
             </button>
           </form>
 
-          <p className="mt-5 text-[11px] text-slate-600 text-center">
-            Demo: agent@test.com / agent123
-          </p>
         </div>
 
         {/* Powered by */}

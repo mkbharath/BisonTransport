@@ -217,3 +217,11 @@ export async function updateUser(id: string, data: Record<string, unknown>) {
 export async function deleteUser(id: string) {
   return request<any>(`/admin/users/${id}`, { method: "DELETE" });
 }
+
+// --- Auth: Change Password ---
+export async function changePassword(currentPassword: string, newPassword: string) {
+  return request<{ message: string }>("/auth/change-password", {
+    method: "POST",
+    body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+  });
+}

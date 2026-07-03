@@ -1,5 +1,7 @@
 import { Link, Outlet, useLocation } from "react-router-dom";
+import { useState } from "react";
 import { useAuth } from "../hooks/useAuth";
+import { changePassword } from "../lib/api";
 import {
   LayoutDashboard,
   Package,
@@ -9,6 +11,7 @@ import {
   FileText,
   LogOut,
   ChevronRight,
+  Key,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -36,6 +39,7 @@ function hasAccess(userRole: string | undefined, minRole: string): boolean {
 export function AppLayout() {
   const { user, logout } = useAuth();
   const location = useLocation();
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
 
   const initials = user?.name
     ? user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
@@ -96,6 +100,13 @@ export function AppLayout() {
               <p className="text-[11px] text-slate-500 capitalize">{user?.role}</p>
             </div>
             <button
+              onClick={() => setShowPasswordModal(true)}
+              className="p-1.5 rounded-md text-slate-500 hover:text-amber-400 hover:bg-amber-500/10 transition-colors"
+              title="Change Password"
+            >
+              <Key className="w-3.5 h-3.5" />
+            </button>
+            <button
               onClick={logout}
               className="p-1.5 rounded-md text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
               title="Sign out"
@@ -119,6 +130,80 @@ export function AppLayout() {
             <Outlet />
           </div>
         </main>
+      </div>
+
+      {/* Change Password Modal */}
+      {showPasswordModal && (
+        <ChangePasswordModal onClose={() => setShowPasswordModal(false)} />
+      )}
+    </div>
+  );
+}
+
+
+function ChangePasswordModal({ onClose }: { onClose: () => void }) {
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    if (newPassword !== confirmPassword) {
+      setError("New passwords do not match");
+      return;
+    }
+    if (newPassword.length < 6) {
+      setError("New password must be at least 6 characters");
+      return;
+    }
+    setLoading(true);
+    try {
+      await changePassword(currentPassword, newPassword);
+      setSuccess(true);
+      setTimeout(onClose, 1500);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to change password";
+      setError(msg.includes("incorrect") ? "Current password is incorrect" : msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div className="bg-white rounded-xl p-6 w-[400px] shadow-2xl">
+        <h3 className="text-lg font-bold text-gray-900 mb-4">Change Password</h3>
+        {success ? (
+          <div className="text-center py-4">
+            <p className="text-emerald-600 font-medium">Password changed successfully!</p>
+          </div>
+        ) : (
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Current Password</label>
+              <input type="password" value={currentPassword} onChange={(e) => setCurrentPassword(e.target.value)} required className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-amber-400 focus:border-amber-400 outline-none" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">New Password</label>
+              <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} required className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-amber-400 focus:border-amber-400 outline-none" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Confirm New Password</label>
+              <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-2 focus:ring-amber-400 focus:border-amber-400 outline-none" />
+            </div>
+            {error && <p className="text-sm text-red-600">{error}</p>}
+            <div className="flex justify-end gap-3 pt-2">
+              <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800">Cancel</button>
+              <button type="submit" disabled={loading} className="px-4 py-2 text-sm font-medium text-white bg-gradient-to-r from-amber-500 to-amber-600 rounded-lg hover:from-amber-600 hover:to-amber-700 disabled:opacity-50">
+                {loading ? "Changing..." : "Change Password"}
+              </button>
+            </div>
+          </form>
+        )}
       </div>
     </div>
   );

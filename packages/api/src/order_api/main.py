@@ -5,18 +5,23 @@ import os
 import time
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+from sqlalchemy import text
 
 from order_shared.adapters import create_adapters, get_adapters
+from order_shared.db.session import async_session_factory
 
 from order_api.auth import (
     LoginRequest,
     TokenResponse,
+    CurrentUser,
     authenticate_user,
     create_access_token,
     create_refresh_token,
+    get_current_user,
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES,
 )
 from order_api.routers import (
@@ -106,6 +111,41 @@ async def login(body: LoginRequest):
         token_type="bearer",
         expires_in=JWT_ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     )
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+@app.post("/api/v1/auth/change-password", tags=["auth"])
+async def change_password(body: ChangePasswordRequest, current_user: CurrentUser = Depends(get_current_user)):
+    """Change the current user's password."""
+    import hashlib as _hashlib
+
+    # Verify current password
+    async with async_session_factory() as session:
+        result = await session.execute(
+            text("SELECT id, password_hash FROM users WHERE id = :id"),
+            {"id": current_user.id},
+        )
+        user_row = result.mappings().first()
+        if not user_row:
+            raise HTTPException(status_code=404, detail={"error": {"code": "NOT_FOUND", "message": "User not found"}})
+
+        current_hash = _hashlib.sha256(body.current_password.encode()).hexdigest()
+        if current_hash != user_row["password_hash"]:
+            raise HTTPException(status_code=400, detail={"error": {"code": "BAD_REQUEST", "message": "Current password is incorrect"}})
+
+        # Update password
+        new_hash = _hashlib.sha256(body.new_password.encode()).hexdigest()
+        await session.execute(
+            text("UPDATE users SET password_hash = :pw WHERE id = :id"),
+            {"pw": new_hash, "id": current_user.id},
+        )
+        await session.commit()
+
+    return {"message": "Password changed successfully"}
 
 
 # --- Mount Routers ---
