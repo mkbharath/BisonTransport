@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { createOrder, getActiveFieldConfigs } from "../lib/api";
@@ -302,8 +302,14 @@ function ReviewSection({
 
 export function NewOrderPage() {
   const navigate = useNavigate();
-  const [currentStep, setCurrentStep] = useState(1);
-  const [formValues, setFormValues] = useState<Record<string, string | boolean>>({});
+  const [currentStep, setCurrentStep] = useState(() => {
+    const saved = sessionStorage.getItem("newOrderStep");
+    return saved ? parseInt(saved) : 1;
+  });
+  const [formValues, setFormValues] = useState<Record<string, string | boolean>>(() => {
+    const saved = sessionStorage.getItem("newOrderForm");
+    return saved ? JSON.parse(saved) : {};
+  });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -316,6 +322,15 @@ export function NewOrderPage() {
     queryKey: ["active-field-configs"],
     queryFn: getActiveFieldConfigs,
   });
+
+  // Persist form state to sessionStorage
+  useEffect(() => {
+    sessionStorage.setItem("newOrderForm", JSON.stringify(formValues));
+  }, [formValues]);
+
+  useEffect(() => {
+    sessionStorage.setItem("newOrderStep", String(currentStep));
+  }, [currentStep]);
 
   const fieldConfigs: FieldConfig[] = useMemo(() => {
     if (!configResponse?.data) return [];
@@ -359,6 +374,8 @@ export function NewOrderPage() {
     onSuccess: (data: Record<string, unknown>) => {
       const orderNumber = (data as Record<string, unknown>)?.order_number || "New Order";
       setSuccessMessage(`Order created: ${orderNumber}`);
+      sessionStorage.removeItem("newOrderForm");
+      sessionStorage.removeItem("newOrderStep");
       setTimeout(() => navigate("/orders"), 2000);
     },
   });
@@ -455,12 +472,13 @@ export function NewOrderPage() {
           }
         }
 
-        // Postal code validation (Canadian or US)
+        // Postal code validation (Canadian, US 5-digit, US 9-digit, or general 5-10 chars)
         if (fieldName.includes("postal_code")) {
           const caRegex = /^[A-Za-z]\d[A-Za-z]\s?\d[A-Za-z]\d$/;
           const usRegex = /^\d{5}(-\d{4})?$/;
-          if (!caRegex.test(strVal) && !usRegex.test(strVal)) {
-            newErrors[fieldName] = "Invalid postal/ZIP code format";
+          const generalRegex = /^[\w\s\-]{3,10}$/;
+          if (!caRegex.test(strVal) && !usRegex.test(strVal) && !generalRegex.test(strVal)) {
+            newErrors[fieldName] = "Invalid postal/ZIP code (e.g., M5V 3C6, 90210, 90210-1234)";
           }
         }
 
@@ -482,6 +500,12 @@ export function NewOrderPage() {
   const handleNext = () => {
     if (validateStep()) {
       setCurrentStep((s) => Math.min(5, s + 1));
+    } else {
+      // Scroll to first error
+      setTimeout(() => {
+        const firstError = document.querySelector(".text-red-600, .border-red-300");
+        if (firstError) firstError.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 100);
     }
   };
 

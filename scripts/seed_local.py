@@ -195,7 +195,7 @@ def seed_field_configurations(session: Session) -> None:
         ("truck_size", "Truck Size", False, False, None, None, 51),
         ("temperature_min_c", "Temperature Min (C)", False, True, "equipment_type", "reefer", 52),
         ("temperature_max_c", "Temperature Max (C)", False, True, "equipment_type", "reefer", 53),
-        ("hazmat_indicator", "Hazmat Indicator", True, False, None, None, 54),
+        ("hazmat_indicator", "Hazmat Indicator", False, False, None, None, 54),
         ("hazmat_un_number", "UN Number", False, True, "hazmat_indicator", "true", 55),
         ("hazmat_class", "Hazmat Class", False, True, "hazmat_indicator", "true", 56),
         ("special_handling_instructions", "Special Handling Instructions", False, False, None, None, 57),
