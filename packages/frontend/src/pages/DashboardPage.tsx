@@ -255,16 +255,30 @@ function DonutChart({ segments, total }: { segments: { value: number; color: str
   const strokeWidth = 36;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
+  const gap = 4; // gap between segments in px
   let cumulativeOffset = 0;
+
+  // Filter out zero-value segments
+  const activeSegments = segments.filter((s) => s.value > 0);
 
   return (
     <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
       <svg width={size} height={size} className="-rotate-90">
-        {segments.map((seg, i) => {
+        {/* Background circle */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          fill="none"
+          stroke="#f1f5f9"
+          strokeWidth={strokeWidth}
+        />
+        {activeSegments.map((seg, i) => {
           const pct = total > 0 ? seg.value / total : 0;
-          const dashLength = pct * circumference;
-          const offset = cumulativeOffset;
-          cumulativeOffset += dashLength;
+          const segmentGap = activeSegments.length > 1 ? gap : 0;
+          const dashLength = Math.max(0, pct * circumference - segmentGap);
+          const offset = cumulativeOffset + (activeSegments.length > 1 ? gap / 2 : 0);
+          cumulativeOffset += pct * circumference;
           return (
             <circle
               key={i}
@@ -274,9 +288,10 @@ function DonutChart({ segments, total }: { segments: { value: number; color: str
               fill="none"
               stroke={seg.color}
               strokeWidth={strokeWidth}
+              strokeLinecap="butt"
               strokeDasharray={`${dashLength} ${circumference - dashLength}`}
               strokeDashoffset={-offset}
-              className="transition-all duration-500"
+              className="transition-all duration-700"
             />
           );
         })}
