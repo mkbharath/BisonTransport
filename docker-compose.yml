@@ -163,15 +163,10 @@ services:
     container_name: order-frontend
     restart: unless-stopped
     ports:
-      - "5173:5173"
-    environment:
-      VITE_API_URL: http://api:8000
+      - "5173:80"
     depends_on:
       api:
         condition: service_healthy
-    volumes:
-      - ./packages/frontend:/app
-      - /app/node_modules
 
 volumes:
   postgres-data:
