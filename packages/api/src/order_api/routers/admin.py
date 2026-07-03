@@ -337,12 +337,11 @@ async def create_user(
     body: UserRequest,
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
-    import hashlib
+    from order_api.auth import hash_password
 
     user_id = str(uuid.uuid4())
-    # Hash the provided password, or default to "changeme" if not provided
     password = body.password or "changeme"
-    password_hash = hashlib.sha256(password.encode()).hexdigest()
+    password_hash = hash_password(password)
 
     async with async_session_factory() as session:
         await session.execute(
@@ -375,15 +374,16 @@ async def update_user(
     current_user: CurrentUser = Depends(require_role("admin")),
 ):
     import hashlib
+    from order_api.auth import hash_password
 
     updates = []
     params: dict = {"id": user_id}
 
     for field, value in body.model_dump(exclude_unset=True).items():
         if field == "password" and value is not None:
-            # Hash the new password
+            # Hash the new password with bcrypt
             updates.append("password_hash = :password_hash")
-            params["password_hash"] = hashlib.sha256(value.encode()).hexdigest()
+            params["password_hash"] = hash_password(value)
         elif field != "password":
             updates.append(f"{field} = :{field}")
             params[field] = value

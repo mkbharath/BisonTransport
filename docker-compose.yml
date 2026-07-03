@@ -3,6 +3,7 @@ services:
   postgres:
     image: pgvector/pgvector:pg16
     container_name: order-postgres
+    restart: unless-stopped
     environment:
       POSTGRES_USER: orderuser
       POSTGRES_PASSWORD: orderpass
@@ -20,6 +21,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: order-redis
+    restart: unless-stopped
     ports:
       - "6379:6379"
     volumes:
@@ -33,6 +35,7 @@ services:
   elasticmq:
     image: softwaremill/elasticmq
     container_name: order-elasticmq
+    restart: unless-stopped
     ports:
       - "9324:9324"
       - "9325:9325"
@@ -42,6 +45,7 @@ services:
   minio:
     image: minio/minio
     container_name: order-minio
+    restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: minioadmin
@@ -93,6 +97,7 @@ services:
       context: .
       dockerfile: infrastructure/docker/Dockerfile.api
     container_name: order-api
+    restart: unless-stopped
     ports:
       - "8000:8000"
     env_file:
@@ -129,6 +134,7 @@ services:
       context: .
       dockerfile: infrastructure/docker/Dockerfile.agents
     container_name: order-agents
+    restart: unless-stopped
     env_file:
       - .env.local
     environment:
@@ -155,6 +161,7 @@ services:
       context: .
       dockerfile: infrastructure/docker/Dockerfile.frontend
     container_name: order-frontend
+    restart: unless-stopped
     ports:
       - "5173:5173"
     environment:

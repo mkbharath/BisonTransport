@@ -157,7 +157,23 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
       return;
     }
     if (newPassword.length < 6) {
-      setError("New password must be at least 6 characters");
+      setError("Password must be at least 8 characters with at least one uppercase, one lowercase, and one number");
+      return;
+    }
+    if (newPassword.length < 8) {
+      setError("Password must be at least 8 characters");
+      return;
+    }
+    if (!/[A-Z]/.test(newPassword)) {
+      setError("Password must contain at least one uppercase letter");
+      return;
+    }
+    if (!/[a-z]/.test(newPassword)) {
+      setError("Password must contain at least one lowercase letter");
+      return;
+    }
+    if (!/[0-9]/.test(newPassword)) {
+      setError("Password must contain at least one number");
       return;
     }
     setLoading(true);

@@ -9,6 +9,9 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
+from slowapi import Limiter
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
 from sqlalchemy import text
 
 from order_shared.adapters import create_adapters, get_adapters
@@ -56,15 +59,42 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+# --- Rate Limiter ---
+limiter = Limiter(key_func=get_remote_address)
+app.state.limiter = limiter
+
+
+@app.exception_handler(RateLimitExceeded)
+async def rate_limit_handler(request: Request, exc: RateLimitExceeded):
+    return JSONResponse(
+        status_code=429,
+        content={"error": {"code": "RATE_LIMITED", "message": "Too many requests. Please try again later."}},
+    )
+
+
 # --- CORS ---
 cors_origins = os.environ.get("CORS_ORIGINS", "http://localhost:5173").split(",")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
+
+
+# --- Security Headers Middleware ---
+@app.middleware("http")
+async def add_security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    if request.url.scheme == "https":
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
 
 
 # --- Request timing middleware ---
@@ -89,7 +119,8 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 # --- Auth endpoint (mounted directly, not in a router) ---
 @app.post("/api/v1/auth/login", response_model=TokenResponse, tags=["auth"])
-async def login(body: LoginRequest):
+@limiter.limit("5/minute")
+async def login(request: Request, body: LoginRequest):
     """Authenticate with email and password, receive JWT tokens."""
     user = await authenticate_user(body.email, body.password)
     if not user:
@@ -121,7 +152,16 @@ class ChangePasswordRequest(BaseModel):
 @app.post("/api/v1/auth/change-password", tags=["auth"])
 async def change_password(body: ChangePasswordRequest, current_user: CurrentUser = Depends(get_current_user)):
     """Change the current user's password."""
-    import hashlib as _hashlib
+    from order_api.auth import verify_password, hash_password
+
+    if len(body.new_password) < 8:
+        raise HTTPException(status_code=400, detail={"error": {"code": "BAD_REQUEST", "message": "Password must be at least 8 characters"}})
+    if not any(c.isupper() for c in body.new_password):
+        raise HTTPException(status_code=400, detail={"error": {"code": "BAD_REQUEST", "message": "Password must contain at least one uppercase letter"}})
+    if not any(c.islower() for c in body.new_password):
+        raise HTTPException(status_code=400, detail={"error": {"code": "BAD_REQUEST", "message": "Password must contain at least one lowercase letter"}})
+    if not any(c.isdigit() for c in body.new_password):
+        raise HTTPException(status_code=400, detail={"error": {"code": "BAD_REQUEST", "message": "Password must contain at least one number"}})
 
     # Verify current password
     async with async_session_factory() as session:
@@ -133,12 +173,11 @@ async def change_password(body: ChangePasswordRequest, current_user: CurrentUser
         if not user_row:
             raise HTTPException(status_code=404, detail={"error": {"code": "NOT_FOUND", "message": "User not found"}})
 
-        current_hash = _hashlib.sha256(body.current_password.encode()).hexdigest()
-        if current_hash != user_row["password_hash"]:
+        if not verify_password(body.current_password, user_row["password_hash"]):
             raise HTTPException(status_code=400, detail={"error": {"code": "BAD_REQUEST", "message": "Current password is incorrect"}})
 
-        # Update password
-        new_hash = _hashlib.sha256(body.new_password.encode()).hexdigest()
+        # Update password with bcrypt
+        new_hash = hash_password(body.new_password)
         await session.execute(
             text("UPDATE users SET password_hash = :pw WHERE id = :id"),
             {"pw": new_hash, "id": current_user.id},
