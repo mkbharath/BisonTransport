@@ -384,10 +384,92 @@ export function NewOrderPage() {
     const newErrors: Record<string, string> = {};
 
     for (const field of visibleFields) {
+      const val = formValues[field.field_name];
+      const strVal = typeof val === "string" ? val.trim() : "";
+
+      // Required check
       if (field.is_mandatory) {
-        const val = formValues[field.field_name];
-        if (val === undefined || val === "" || val === false) {
+        if (val === undefined || val === "" || val === false || strVal === "") {
           newErrors[field.field_name] = `${field.label} is required`;
+          continue;
+        }
+      }
+
+      // Format validation (only if value is present)
+      if (strVal) {
+        const fieldName = field.field_name;
+
+        // Email validation
+        if (fieldName.endsWith("_email") || fieldName === "contact_email") {
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (!emailRegex.test(strVal)) {
+            newErrors[fieldName] = "Invalid email format (e.g., name@company.com)";
+          }
+        }
+
+        // Phone validation
+        if (fieldName.endsWith("_phone") || fieldName === "contact_phone") {
+          const phoneRegex = /^[+]?[\d\s\-().]{7,20}$/;
+          if (!phoneRegex.test(strVal)) {
+            newErrors[fieldName] = "Invalid phone format (e.g., +1-416-555-1234)";
+          }
+        }
+
+        // Weight validation (positive number)
+        if (fieldName === "total_weight") {
+          const numVal = parseFloat(strVal);
+          if (isNaN(numVal) || numVal <= 0) {
+            newErrors[fieldName] = "Weight must be a positive number";
+          }
+        }
+
+        // Pallets (positive integer)
+        if (fieldName === "num_pallets") {
+          const numVal = parseInt(strVal);
+          if (isNaN(numVal) || numVal < 0) {
+            newErrors[fieldName] = "Must be a non-negative whole number";
+          }
+        }
+
+        // Total quantity (positive integer)
+        if (fieldName === "total_quantity") {
+          const numVal = parseInt(strVal);
+          if (isNaN(numVal) || numVal < 0) {
+            newErrors[fieldName] = "Must be a non-negative whole number";
+          }
+        }
+
+        // Date validation (not in the past for pickup/delivery)
+        if (fieldName === "pickup_date" || fieldName === "delivery_date") {
+          const today = new Date().toISOString().split("T")[0];
+          if (strVal < today) {
+            newErrors[fieldName] = "Date cannot be in the past";
+          }
+        }
+
+        // Delivery date must be >= pickup date
+        if (fieldName === "delivery_date") {
+          const pickupDate = typeof formValues["pickup_date"] === "string" ? formValues["pickup_date"] : "";
+          if (pickupDate && strVal < pickupDate) {
+            newErrors[fieldName] = "Delivery date must be on or after pickup date";
+          }
+        }
+
+        // Postal code validation (Canadian or US)
+        if (fieldName.includes("postal_code")) {
+          const caRegex = /^[A-Za-z]\d[A-Za-z]\s?\d[A-Za-z]\d$/;
+          const usRegex = /^\d{5}(-\d{4})?$/;
+          if (!caRegex.test(strVal) && !usRegex.test(strVal)) {
+            newErrors[fieldName] = "Invalid postal/ZIP code format";
+          }
+        }
+
+        // Temperature fields (must be a number)
+        if (fieldName.startsWith("temperature_")) {
+          const numVal = parseFloat(strVal);
+          if (isNaN(numVal)) {
+            newErrors[fieldName] = "Must be a valid number";
+          }
         }
       }
     }
