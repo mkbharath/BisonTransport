@@ -19,6 +19,8 @@ async def list_hitl_items(
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
     queue_type: str | None = None,
+    search: str | None = None,
+    sort: str | None = Query(None, description="Sort: created_desc, created_asc, confidence_desc, confidence_asc"),
     current_user: CurrentUser = Depends(require_role("agent")),
 ):
     """List HITL review items — orders requiring human review."""
@@ -26,9 +28,21 @@ async def list_hitl_items(
     conditions = ["o.status = 'pending_review'"]
     params: dict = {"limit": limit, "offset": offset}
 
+    if search:
+        conditions.append("(o.order_number ILIKE :search OR o.customer_name ILIKE :search OR o.commodity ILIKE :search)")
+        params["search"] = f"%{search}%"
     if queue_type:
         conditions.append("o.processing_mode = :queue_type")
         params["queue_type"] = queue_type
+
+    # Sort order
+    sort_clause = "o.created_at DESC"
+    if sort == "created_asc":
+        sort_clause = "o.created_at ASC"
+    elif sort == "confidence_desc":
+        sort_clause = "o.overall_confidence_score DESC NULLS LAST"
+    elif sort == "confidence_asc":
+        sort_clause = "o.overall_confidence_score ASC NULLS LAST"
 
     where_clause = " AND ".join(conditions)
 
@@ -46,7 +60,7 @@ async def list_hitl_items(
                        o.created_at, o.updated_at
                 FROM orders o
                 WHERE {where_clause}
-                ORDER BY o.overall_confidence_score ASC NULLS LAST, o.created_at ASC
+                ORDER BY {sort_clause}
                 LIMIT :limit OFFSET :offset
             """),
             params,

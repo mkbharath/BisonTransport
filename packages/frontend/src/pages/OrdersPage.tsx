@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { useSearchParams, Link } from "react-router-dom";
+import { useState } from "react";
 import { getOrders } from "../lib/api";
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Search } from "lucide-react";
 
 const STATUS_STYLES: Record<string, { bg: string; dot: string }> = {
   order_created: { bg: "bg-emerald-50 text-emerald-700", dot: "bg-emerald-500" },
@@ -39,11 +40,23 @@ export function OrdersPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const page = parseInt(searchParams.get("page") || "1");
   const status = searchParams.get("status") || undefined;
+  const [searchTerm, setSearchTerm] = useState(searchParams.get("search") || "");
 
   const { data, isLoading } = useQuery({
-    queryKey: ["orders", page, status],
-    queryFn: () => getOrders({ page, limit: 20, ...(status ? { status } : {}) }),
+    queryKey: ["orders", page, status, searchParams.get("search")],
+    queryFn: () => getOrders({ page, limit: 20, ...(status ? { status } : {}), ...(searchParams.get("search") ? { search: searchParams.get("search")! } : {}) }),
   });
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchTerm.trim()) {
+      searchParams.set("search", searchTerm.trim());
+    } else {
+      searchParams.delete("search");
+    }
+    searchParams.set("page", "1");
+    setSearchParams(searchParams);
+  };
 
   const setPage = (newPage: number) => {
     searchParams.set("page", String(newPage));
@@ -63,6 +76,23 @@ export function OrdersPage() {
           New Order
         </Link>
       </div>
+
+      {/* Search */}
+      <form onSubmit={handleSearch} className="mb-4">
+        <div className="relative max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search by order number, customer, commodity..."
+            className="w-full pl-10 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-500"
+          />
+          {searchParams.get("search") && (
+            <button type="button" onClick={() => { setSearchTerm(""); searchParams.delete("search"); searchParams.set("page", "1"); setSearchParams(searchParams); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs">Clear</button>
+          )}
+        </div>
+      </form>
 
       {/* Filter Tabs */}
       <div className="flex items-center gap-1.5 mb-5 overflow-x-auto pb-1">

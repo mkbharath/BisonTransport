@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { getEmails, getEmail } from "../lib/api";
 import { useState } from "react";
-import { FileText, Mail } from "lucide-react";
+import { FileText, Mail, Search } from "lucide-react";
 
 const CLASS_STYLES: Record<string, { bg: string; icon: string }> = {
   new_order: { bg: "bg-blue-100 text-blue-700", icon: "📦" },
@@ -22,10 +22,11 @@ function SenderAvatar({ name }: { name: string }) {
 
 export function InboxPage() {
   const [selectedEmailId, setSelectedEmailId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
 
   const { data, isLoading } = useQuery({
-    queryKey: ["emails"],
-    queryFn: () => getEmails({ limit: 50 }),
+    queryKey: ["emails", searchTerm],
+    queryFn: () => getEmails({ limit: 50, ...(searchTerm ? { search: searchTerm } : {}) }),
   });
 
   const { data: emailDetail } = useQuery({
@@ -36,8 +37,24 @@ export function InboxPage() {
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Email Inbox</h1>
-      <div className="flex gap-4 h-[calc(100vh-12rem)]">
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-2xl font-bold text-gray-900">Email Inbox</h1>
+      </div>
+      {/* Search */}
+      <div className="relative max-w-md mb-4">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <input
+          type="text"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          placeholder="Search by subject or sender..."
+          className="w-full pl-10 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-500"
+        />
+        {searchTerm && (
+          <button onClick={() => setSearchTerm("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs">Clear</button>
+        )}
+      </div>
+      <div className="flex gap-4 h-[calc(100vh-14rem)]">
         {/* Email List - Left Panel */}
         <div className="w-[35%] flex-shrink-0 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden flex flex-col">
           <div className="px-4 py-3 border-b border-gray-100 bg-gray-50/50">

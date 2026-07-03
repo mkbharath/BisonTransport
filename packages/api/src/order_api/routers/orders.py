@@ -70,6 +70,7 @@ async def list_orders(
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
     status: str | None = None,
+    search: str | None = None,
     customer_id: str | None = None,
     date_from: str | None = None,
     date_to: str | None = None,
@@ -83,6 +84,9 @@ async def list_orders(
     conditions = []
     params: dict = {"limit": limit, "offset": offset}
 
+    if search:
+        conditions.append("(o.order_number ILIKE :search OR o.customer_name ILIKE :search OR o.commodity ILIKE :search OR o.contact_name ILIKE :search)")
+        params["search"] = f"%{search}%"
     if status:
         conditions.append("o.status = :status")
         params["status"] = status

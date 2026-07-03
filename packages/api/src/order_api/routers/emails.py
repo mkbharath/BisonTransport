@@ -22,6 +22,7 @@ async def list_emails(
     limit: int = Query(20, ge=1, le=100),
     status: str | None = None,
     classification: str | None = None,
+    search: str | None = None,
     current_user: CurrentUser = Depends(get_current_user),
 ):
     """List emails with pagination and optional filters."""
@@ -29,6 +30,9 @@ async def list_emails(
     conditions = []
     params: dict = {"limit": limit, "offset": offset}
 
+    if search:
+        conditions.append("(e.subject ILIKE :search OR e.from_address ILIKE :search)")
+        params["search"] = f"%{search}%"
     if status:
         conditions.append("e.status = :status")
         params["status"] = status

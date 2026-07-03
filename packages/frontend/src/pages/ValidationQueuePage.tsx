@@ -1,7 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { getHitlQueue, approveOrder, rejectOrder } from "../lib/api";
 import { Link } from "react-router-dom";
-import { CheckCircle, XCircle, ClipboardCheck } from "lucide-react";
+import { useState } from "react";
+import { CheckCircle, XCircle, ClipboardCheck, Search, ArrowUpDown } from "lucide-react";
 import { useAuth } from "../hooks/useAuth";
 
 function ConfidenceRing({ score }: { score: number }) {
@@ -23,10 +24,12 @@ export function ValidationQueuePage() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const canApprove = user?.role === "agent" || user?.role === "supervisor" || user?.role === "admin";
+  const [searchTerm, setSearchTerm] = useState("");
+  const [sortBy, setSortBy] = useState("created_desc");
 
   const { data, isLoading } = useQuery({
-    queryKey: ["hitl-queue"],
-    queryFn: () => getHitlQueue({ limit: 50 }),
+    queryKey: ["hitl-queue", searchTerm, sortBy],
+    queryFn: () => getHitlQueue({ limit: 50, ...(searchTerm ? { search: searchTerm } : {}), sort: sortBy }),
     refetchInterval: 15_000,
   });
 
@@ -50,10 +53,36 @@ export function ValidationQueuePage() {
 
   return (
     <div className="animate-slide-up">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Review Queue</h1>
           <p className="text-sm text-gray-500 mt-0.5">{data?.total_count ?? 0} items pending review</p>
+        </div>
+      </div>
+
+      {/* Search + Sort */}
+      <div className="flex items-center gap-3 mb-5">
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search by order number or customer..."
+            className="w-full pl-10 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-500"
+          />
+          {searchTerm && (
+            <button onClick={() => setSearchTerm("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 text-xs">Clear</button>
+          )}
+        </div>
+        <div className="flex items-center gap-1.5">
+          <ArrowUpDown className="w-4 h-4 text-gray-400" />
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="text-sm border border-gray-200 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-amber-500/40 bg-white">
+            <option value="created_desc">Newest First</option>
+            <option value="created_asc">Oldest First</option>
+            <option value="confidence_asc">Lowest Confidence</option>
+            <option value="confidence_desc">Highest Confidence</option>
+          </select>
         </div>
       </div>
 
