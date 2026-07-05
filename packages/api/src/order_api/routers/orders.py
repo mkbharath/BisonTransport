@@ -144,6 +144,10 @@ async def create_order(
     order_id = str(uuid.uuid4())
     order_number = f"ORD-{datetime.now(timezone.utc).strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
 
+    # Hazmat orders require supervisor approval even when manually entered
+    initial_status = "pending_review" if getattr(body, "hazmat_indicator", False) else "order_created"
+    processing_mode = "manual_hitl" if initial_status == "pending_review" else "manual_entry"
+
     async with async_session_factory() as session:
         await session.execute(
             text("""
@@ -160,7 +164,7 @@ async def create_order(
                     :delivery_location_name, CAST(:delivery_address AS jsonb), :delivery_date,
                     :commodity, :freight_type, :equipment_type, :total_weight, :weight_unit,
                     :num_pallets, :hazmat_indicator, :hazmat_un_number, :hazmat_class,
-                    :notes, 'order_created', 'manual_entry', NOW())
+                    :notes, :status, :processing_mode, NOW())
             """),
             {
                 "id": order_id,
@@ -186,6 +190,8 @@ async def create_order(
                 "hazmat_un_number": getattr(body, 'hazmat_un_number', None),
                 "hazmat_class": getattr(body, 'hazmat_class', None),
                 "notes": body.notes,
+                "status": initial_status,
+                "processing_mode": processing_mode,
             },
         )
         await session.commit()
