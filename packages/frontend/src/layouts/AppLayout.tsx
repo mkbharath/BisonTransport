@@ -12,6 +12,8 @@ import {
   LogOut,
   ChevronRight,
   Key,
+  Menu,
+  X,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -40,25 +42,39 @@ export function AppLayout() {
   const { user, logout } = useAuth();
   const location = useLocation();
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const initials = user?.name
     ? user.name.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2)
     : "U";
 
+  // Close sidebar on navigation (mobile)
+  const handleNavClick = () => setSidebarOpen(false);
+
   return (
     <div className="flex h-screen overflow-hidden bg-slate-50">
+      {/* Mobile overlay */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setSidebarOpen(false)} />
+      )}
+
       {/* Sidebar */}
-      <aside className="w-[260px] flex-shrink-0 bg-[#0f1b2d] text-white flex flex-col">
+      <aside className={`fixed inset-y-0 left-0 z-50 w-[260px] bg-[#0f1b2d] text-white flex flex-col transform transition-transform duration-200 ease-in-out lg:relative lg:translate-x-0 lg:flex-shrink-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
         {/* Logo */}
-        <div className="px-5 py-5 border-b border-white/5">
-          <img
-            src="/Bison-2022-Logo-RGB_Not-Registered.png"
-            alt="Bison Transport"
-            className="h-9 object-contain brightness-0 invert"
-          />
-          <p className="text-[11px] text-slate-300 mt-1.5 tracking-wide uppercase">
-            Order Intelligence Platform
-          </p>
+        <div className="px-5 py-5 border-b border-white/5 flex items-center justify-between">
+          <div>
+            <img
+              src="/Bison-2022-Logo-RGB_Not-Registered.png"
+              alt="Bison Transport"
+              className="h-9 object-contain brightness-0 invert"
+            />
+            <p className="text-[11px] text-slate-300 mt-1.5 tracking-wide uppercase">
+              Order Intelligence Platform
+            </p>
+          </div>
+          <button onClick={() => setSidebarOpen(false)} className="lg:hidden p-1 text-slate-400 hover:text-white">
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
         {/* Navigation */}
@@ -75,6 +91,7 @@ export function AppLayout() {
               <Link
                 key={item.path}
                 to={item.path}
+                onClick={handleNavClick}
                 className={`flex items-center gap-3 px-4 py-3 rounded-lg text-[14px] font-medium transition-all duration-150 ${
                   isActive
                     ? "bg-gradient-to-r from-amber-500/20 to-orange-500/10 text-amber-400 border border-amber-500/20"
@@ -124,8 +141,19 @@ export function AppLayout() {
 
       {/* Main */}
       <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Mobile Top Bar */}
+        <div className="lg:hidden flex items-center gap-3 px-4 py-3 bg-[#0f1b2d] border-b border-white/5">
+          <button onClick={() => setSidebarOpen(true)} className="p-1.5 text-white">
+            <Menu className="w-5 h-5" />
+          </button>
+          <img
+            src="/Bison-2022-Logo-RGB_Not-Registered.png"
+            alt="Bison Transport"
+            className="h-7 object-contain brightness-0 invert"
+          />
+        </div>
         {/* Content */}
-        <main className="flex-1 overflow-y-auto p-6 bg-slate-50">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-50">
           <div className="animate-fade-in max-w-[1400px]">
             <Outlet />
           </div>

@@ -53,7 +53,7 @@ export function DashboardPage() {
       </div>
 
       {/* KPI Row — 5 tiles like Power BI scorecard */}
-      <div className="grid grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
         <KPITile label="TOTAL ORDERS" value={data.total_orders} color="#1e40af" bgColor="bg-blue-50" />
         <KPITile label="COMPLETED" value={data.completed} color="#047857" bgColor="bg-emerald-50" to="/orders?status=order_created" />
         <KPITile label="STP RATE" value={`${data.stp_rate}%`} color="#b45309" bgColor="bg-amber-50" />
@@ -62,9 +62,9 @@ export function DashboardPage() {
       </div>
 
       {/* Charts Row */}
-      <div className="grid grid-cols-12 gap-3">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3">
         {/* Donut Chart — Order Status Distribution */}
-        <div className="col-span-5 bg-white border border-gray-200 rounded-xl p-6">
+        <div className="lg:col-span-5 bg-white border border-gray-200 rounded-xl p-6">
           <h3 className="text-[11px] font-bold text-gray-700 uppercase tracking-wider mb-4">Order Status Distribution</h3>
           <div className="flex items-center justify-center gap-10">
             <DonutChart
@@ -88,7 +88,7 @@ export function DashboardPage() {
         </div>
 
         {/* Horizontal Bar — Pipeline Breakdown */}
-        <div className="col-span-4 bg-white border border-gray-200 rounded-xl p-6">
+        <div className="lg:col-span-4 bg-white border border-gray-200 rounded-xl p-6">
           <h3 className="text-[11px] font-bold text-gray-700 uppercase tracking-wider mb-4">Pipeline Breakdown</h3>
           <div className="space-y-5">
             <HBar label="Completed" value={data.completed} max={total} color="#10b981" to="/orders?status=order_created" />
@@ -101,7 +101,7 @@ export function DashboardPage() {
         </div>
 
         {/* Stacked Bar — STP vs HITL */}
-        <div className="col-span-3 bg-white border border-gray-200 rounded-xl p-6">
+        <div className="lg:col-span-3 bg-white border border-gray-200 rounded-xl p-6">
           <h3 className="text-[11px] font-bold text-gray-700 uppercase tracking-wider mb-4">Processing Mode</h3>
           {/* Stacked progress bar */}
           <div className="h-5 rounded-full overflow-hidden flex bg-gray-100 mb-3">

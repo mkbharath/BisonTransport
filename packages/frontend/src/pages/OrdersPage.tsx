@@ -27,11 +27,11 @@ function ConfidenceBar({ score }: { score: number | null }) {
   if (score == null) return <span className="text-gray-300 text-xs">—</span>;
   const color = score >= 90 ? "bg-emerald-500" : score >= 80 ? "bg-amber-500" : "bg-red-500";
   return (
-    <div className="flex items-center gap-2 w-[120px]">
+    <div className="flex items-center gap-2 w-[100px]">
       <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
         <div className={`h-full rounded-full ${color}`} style={{ width: `${Math.min(score, 100)}%` }} />
       </div>
-      <span className="text-[12px] font-bold text-gray-700 w-10 text-right">{score.toFixed(0)}%</span>
+      <span className="text-[12px] font-bold text-gray-700 w-8 text-right">{score.toFixed(0)}%</span>
     </div>
   );
 }
@@ -136,16 +136,16 @@ export function OrdersPage() {
         </div>
       ) : (
         <>
-          <div className="bg-white rounded-xl border border-gray-200/80 overflow-hidden shadow-sm">
-            <table className="w-full text-[13px] table-fixed">
+          <div className="bg-white rounded-xl border border-gray-200/80 overflow-x-auto shadow-sm">
+            <table className="w-full text-[13px] min-w-[800px]">
               <thead>
                 <tr className="border-b border-gray-200 bg-gray-50">
-                  <th className="px-5 py-3 text-left text-[12px] font-bold text-gray-700 uppercase tracking-wider w-[18%]">Order</th>
-                  <th className="px-5 py-3 text-left text-[12px] font-bold text-gray-700 uppercase tracking-wider w-[22%]">Customer</th>
-                  <th className="px-5 py-3 text-left text-[12px] font-bold text-gray-700 uppercase tracking-wider w-[12%]">Pickup</th>
-                  <th className="px-5 py-3 text-left text-[12px] font-bold text-gray-700 uppercase tracking-wider w-[13%]">Equipment</th>
-                  <th className="px-5 py-3 text-left text-[12px] font-bold text-gray-700 uppercase tracking-wider w-[15%]">Status</th>
-                  <th className="px-5 py-3 text-left text-[12px] font-bold text-gray-700 uppercase tracking-wider w-[20%]">Confidence</th>
+                  <th className="px-4 py-3 text-left text-[12px] font-bold text-gray-700 uppercase tracking-wider">Order</th>
+                  <th className="px-4 py-3 text-left text-[12px] font-bold text-gray-700 uppercase tracking-wider">Customer</th>
+                  <th className="px-4 py-3 text-left text-[12px] font-bold text-gray-700 uppercase tracking-wider">Pickup</th>
+                  <th className="px-4 py-3 text-left text-[12px] font-bold text-gray-700 uppercase tracking-wider">Equipment</th>
+                  <th className="px-4 py-3 text-left text-[12px] font-bold text-gray-700 uppercase tracking-wider">Status</th>
+                  <th className="px-4 py-3 text-left text-[12px] font-bold text-gray-700 uppercase tracking-wider">Confidence</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -154,21 +154,21 @@ export function OrdersPage() {
                   const style = STATUS_STYLES[statusStr] || { bg: "bg-gray-50 text-gray-600", dot: "bg-gray-400" };
                   return (
                     <tr key={order.id as string} className="hover:bg-slate-50/60 transition-colors">
-                      <td className="px-5 py-3">
+                      <td className="px-4 py-3">
                         <Link to={`/orders/${order.id as string}`} className="text-blue-600 hover:text-blue-800 font-semibold whitespace-nowrap text-[12px]">
                           {order.order_number as string}
                         </Link>
                       </td>
-                      <td className="px-5 py-3 text-gray-700 font-medium truncate">{(order.customer_name as string) || "—"}</td>
-                      <td className="px-5 py-3 text-gray-600">{(order.pickup_date as string) || "—"}</td>
-                      <td className="px-5 py-3 text-gray-600 capitalize">{(order.equipment_type as string)?.replace("_", " ") || "—"}</td>
-                      <td className="px-5 py-3">
-                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-semibold ${style.bg}`}>
+                      <td className="px-4 py-3 text-gray-700 font-medium truncate">{(order.customer_name as string) || "—"}</td>
+                      <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{(order.pickup_date as string) || "—"}</td>
+                      <td className="px-4 py-3 text-gray-600 capitalize whitespace-nowrap">{(order.equipment_type as string)?.replace("_", " ") || "—"}</td>
+                      <td className="px-4 py-3">
+                        <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[12px] font-semibold whitespace-nowrap ${style.bg}`}>
                           <span className={`w-2 h-2 rounded-full ${style.dot}`} />
                           {statusStr?.replace(/_/g, " ")}
                         </span>
                       </td>
-                      <td className="px-5 py-3">
+                      <td className="px-4 py-3">
                         <ConfidenceBar score={order.overall_confidence_score as number | null} />
                       </td>
                     </tr>
