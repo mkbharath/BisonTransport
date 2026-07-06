@@ -66,7 +66,7 @@ async def get_dashboard(current_user: CurrentUser = Depends(get_current_user)):
                 WHERE o.status = 'order_created'
                 AND o.updated_at IS NOT NULL
                 AND e.received_at IS NOT NULL
-                AND o.created_at > NOW() - INTERVAL '24 hours'
+                AND o.created_at > NOW() - INTERVAL '30 days'
             """)
         )
         raw_avg = r.scalar()
