@@ -55,33 +55,30 @@ export function AppLayout() {
     <div className="flex h-screen overflow-hidden bg-slate-50">
       {/* Mobile overlay */}
       {sidebarOpen && (
-        <div className="fixed inset-0 z-40 bg-black/50 lg:hidden" onClick={() => setSidebarOpen(false)} />
+        <div className="fixed inset-0 z-40 bg-black/40 backdrop-blur-sm lg:hidden" onClick={() => setSidebarOpen(false)} />
       )}
 
       {/* Sidebar */}
-      <aside className={`fixed inset-y-0 left-0 z-50 w-[260px] bg-[#0f1b2d] text-white flex flex-col transform transition-transform duration-200 ease-in-out lg:relative lg:translate-x-0 lg:flex-shrink-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+      <aside className={`fixed inset-y-0 left-0 z-50 w-[270px] bg-white shadow-xl flex flex-col transform transition-transform duration-200 ease-in-out lg:relative lg:translate-x-0 lg:flex-shrink-0 lg:shadow-none lg:border-r lg:border-gray-100 ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
         {/* Logo */}
-        <div className="px-5 py-5 border-b border-white/5 flex items-center justify-between">
+        <div className="px-6 pt-6 pb-4 flex items-center justify-between">
           <div>
             <img
               src="/Bison-2022-Logo-RGB_Not-Registered.png"
               alt="Bison Transport"
-              className="h-9 object-contain brightness-0 invert"
+              className="h-10 object-contain"
             />
-            <p className="text-[11px] text-slate-300 mt-1.5 tracking-wide uppercase">
-              Order Intelligence Platform
+            <p className="text-[10px] text-gray-400 mt-2 tracking-widest uppercase font-semibold">
+              Order Intelligence
             </p>
           </div>
-          <button onClick={() => setSidebarOpen(false)} className="lg:hidden p-1 text-slate-400 hover:text-white">
+          <button onClick={() => setSidebarOpen(false)} className="lg:hidden p-1 text-gray-400 hover:text-gray-600">
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 px-3 py-5 space-y-0.5">
-          <p className="px-3 mb-2 text-[10px] font-semibold text-slate-500 uppercase tracking-wider">
-            Menu
-          </p>
+        <nav className="flex-1 px-4 py-3 space-y-1 overflow-y-auto">
           {NAV_ITEMS.filter((item) => hasAccess(user?.role, item.minRole)).map((item) => {
             const Icon = item.icon;
             const isActive =
@@ -92,49 +89,47 @@ export function AppLayout() {
                 key={item.path}
                 to={item.path}
                 onClick={handleNavClick}
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg text-[14px] font-medium transition-all duration-150 ${
+                className={`flex items-center gap-3 px-4 py-2.5 rounded-xl text-[13px] font-semibold transition-all duration-200 ${
                   isActive
-                    ? "bg-gradient-to-r from-amber-500/20 to-orange-500/10 text-amber-400 border border-amber-500/20"
-                    : "text-slate-400 hover:bg-white/5 hover:text-slate-200"
+                    ? "bg-gradient-to-r from-teal-500 to-cyan-500 text-white shadow-lg shadow-teal-500/25"
+                    : "text-gray-500 hover:text-gray-900 hover:bg-gray-50"
                 }`}
               >
-                <Icon className={`w-5 h-5 ${isActive ? "text-amber-400" : "text-slate-500"}`} />
+                <Icon className={`w-[18px] h-[18px] ${isActive ? "text-white" : "text-gray-400"}`} />
                 <span className="flex-1">{item.label}</span>
-                {isActive && <ChevronRight className="w-3.5 h-3.5 text-amber-400/60" />}
               </Link>
             );
           })}
         </nav>
 
         {/* User + Powered By */}
-        <div className="px-3 py-4 border-t border-white/5">
-          <div className="flex items-center gap-3 px-2 mb-4">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-[11px] font-bold text-white shadow-lg shadow-amber-500/20">
+        <div className="px-4 py-4 border-t border-gray-100">
+          <div className="flex items-center gap-3 px-2 mb-3">
+            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-teal-400 to-cyan-500 flex items-center justify-center text-[11px] font-bold text-white shadow-md shadow-teal-400/20">
               {initials}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-[13px] font-medium text-slate-200 truncate">{user?.name}</p>
-              <p className="text-[11px] text-slate-500 capitalize">{user?.role}</p>
+              <p className="text-[13px] font-semibold text-gray-800 truncate">{user?.name}</p>
+              <p className="text-[11px] text-gray-400 capitalize">{user?.role}</p>
             </div>
             <button
               onClick={() => setShowPasswordModal(true)}
-              className="p-1.5 rounded-md text-slate-500 hover:text-amber-400 hover:bg-amber-500/10 transition-colors"
+              className="p-1.5 rounded-lg text-gray-400 hover:text-teal-600 hover:bg-teal-50 transition-colors"
               title="Change Password"
             >
-              <Key className="w-3.5 h-3.5" />
+              <Key className="w-4 h-4" />
             </button>
             <button
               onClick={logout}
-              className="p-1.5 rounded-md text-slate-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+              className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors"
               title="Sign out"
             >
-              <LogOut className="w-3.5 h-3.5" />
+              <LogOut className="w-4 h-4" />
             </button>
           </div>
-          {/* Powered by */}
           <div className="flex items-center gap-2 px-2">
-            <span className="text-[11px] text-slate-300 uppercase tracking-wider">Powered by</span>
-            <img src="/ideyalabs.png" alt="ideyaLabs" className="h-6 object-contain opacity-90" />
+            <span className="text-[9px] text-gray-400 uppercase tracking-widest">Powered by</span>
+            <img src="/ideyalabs.png" alt="ideyaLabs" className="h-5 object-contain" />
           </div>
         </div>
       </aside>
@@ -142,14 +137,14 @@ export function AppLayout() {
       {/* Main */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Mobile Top Bar */}
-        <div className="lg:hidden flex items-center gap-3 px-4 py-3 bg-[#0f1b2d] border-b border-white/5">
-          <button onClick={() => setSidebarOpen(true)} className="p-1.5 text-white">
+        <div className="lg:hidden flex items-center gap-3 px-4 py-3 bg-white border-b border-gray-100 shadow-sm">
+          <button onClick={() => setSidebarOpen(true)} className="p-1.5 text-gray-600 hover:text-gray-900">
             <Menu className="w-5 h-5" />
           </button>
           <img
             src="/Bison-2022-Logo-RGB_Not-Registered.png"
             alt="Bison Transport"
-            className="h-7 object-contain brightness-0 invert"
+            className="h-7 object-contain"
           />
         </div>
         {/* Content */}
@@ -230,65 +225,65 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-fade-in">
-      <div className="bg-[#0f1b2d] border border-white/10 rounded-2xl w-[440px] shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm animate-fade-in">
+      <div className="bg-white rounded-3xl w-[440px] shadow-2xl shadow-gray-300/30 border border-gray-100 overflow-hidden">
         {/* Header */}
         <div className="px-7 pt-7 pb-4">
           <div className="flex items-center gap-3 mb-1">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center shadow-lg shadow-amber-500/20">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-teal-400 to-cyan-500 flex items-center justify-center shadow-lg shadow-teal-500/20">
               <Key className="w-5 h-5 text-white" />
             </div>
             <div>
-              <h3 className="text-lg font-bold text-white">Change Password</h3>
-              <p className="text-xs text-slate-400">Update your account security</p>
+              <h3 className="text-lg font-bold text-gray-900">Change Password</h3>
+              <p className="text-xs text-gray-400">Update your account security</p>
             </div>
           </div>
         </div>
 
         {success ? (
           <div className="px-7 pb-7 text-center py-8">
-            <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-emerald-500/10 flex items-center justify-center">
-              <svg className="w-7 h-7 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+            <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-teal-50 flex items-center justify-center">
+              <svg className="w-7 h-7 text-teal-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
             </div>
-            <p className="text-emerald-400 font-semibold text-sm">Password changed successfully!</p>
-            <p className="text-slate-500 text-xs mt-1">Redirecting...</p>
+            <p className="text-teal-600 font-semibold text-sm">Password changed successfully!</p>
+            <p className="text-gray-400 text-xs mt-1">Redirecting...</p>
           </div>
         ) : (
           <form onSubmit={handleSubmit} className="px-7 pb-7">
             {/* Current Password */}
             <div className="mb-4">
-              <label className="block text-xs font-medium text-slate-400 mb-1.5">Current Password</label>
+              <label className="block text-[11px] font-bold text-gray-500 mb-1.5 uppercase tracking-widest">Current Password</label>
               <div className="relative">
                 <input
                   type={showCurrent ? "text" : "password"}
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
                   required
-                  className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20 transition-all pr-10"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-teal-400 focus:ring-4 focus:ring-teal-500/10 focus:bg-white transition-all pr-10"
                   placeholder="Enter current password"
                 />
-                <button type="button" onClick={() => setShowCurrent(!showCurrent)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300">
+                <button type="button" onClick={() => setShowCurrent(!showCurrent)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={showCurrent ? "M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" : "M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178zM15 12a3 3 0 11-6 0 3 3 0 016 0z"} /></svg>
                 </button>
               </div>
             </div>
 
             {/* Divider */}
-            <div className="border-t border-white/5 my-5" />
+            <div className="border-t border-gray-100 my-5" />
 
             {/* New Password */}
             <div className="mb-4">
-              <label className="block text-xs font-medium text-slate-400 mb-1.5">New Password</label>
+              <label className="block text-[11px] font-bold text-gray-500 mb-1.5 uppercase tracking-widest">New Password</label>
               <div className="relative">
                 <input
                   type={showNew ? "text" : "password"}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
                   required
-                  className="w-full px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-sm text-white placeholder:text-slate-500 focus:outline-none focus:border-amber-500/50 focus:ring-1 focus:ring-amber-500/20 transition-all pr-10"
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:border-teal-400 focus:ring-4 focus:ring-teal-500/10 focus:bg-white transition-all pr-10"
                   placeholder="Min 8 characters"
                 />
-                <button type="button" onClick={() => setShowNew(!showNew)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300">
+                <button type="button" onClick={() => setShowNew(!showNew)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={showNew ? "M3.98 8.223A10.477 10.477 0 001.934 12C3.226 16.338 7.244 19.5 12 19.5c.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" : "M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178zM15 12a3 3 0 11-6 0 3 3 0 016 0z"} /></svg>
                 </button>
               </div>
@@ -297,10 +292,10 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
                 <div className="mt-2">
                   <div className="flex gap-1 mb-1">
                     {[1, 2, 3, 4, 5].map((i) => (
-                      <div key={i} className={`h-1 flex-1 rounded-full transition-all ${i <= passwordStrength.score ? passwordStrength.color : "bg-white/10"}`} />
+                      <div key={i} className={`h-1.5 flex-1 rounded-full transition-all ${i <= passwordStrength.score ? passwordStrength.color : "bg-gray-100"}`} />
                     ))}
                   </div>
-                  <p className={`text-[10px] font-medium ${passwordStrength.score <= 2 ? "text-red-400" : passwordStrength.score <= 3 ? "text-amber-400" : "text-emerald-400"}`}>
+                  <p className={`text-[10px] font-semibold ${passwordStrength.score <= 2 ? "text-red-500" : passwordStrength.score <= 3 ? "text-amber-500" : "text-teal-500"}`}>
                     {passwordStrength.label}
                   </p>
                 </div>
@@ -309,33 +304,33 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
 
             {/* Confirm Password */}
             <div className="mb-4">
-              <label className="block text-xs font-medium text-slate-400 mb-1.5">Confirm New Password</label>
+              <label className="block text-[11px] font-bold text-gray-500 mb-1.5 uppercase tracking-widest">Confirm New Password</label>
               <input
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 required
-                className={`w-full px-4 py-2.5 bg-white/5 border rounded-lg text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-1 transition-all ${
+                className={`w-full px-4 py-3 bg-gray-50 border rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-4 transition-all ${
                   confirmPassword && confirmPassword !== newPassword
-                    ? "border-red-500/50 focus:border-red-500/50 focus:ring-red-500/20"
+                    ? "border-red-300 focus:border-red-400 focus:ring-red-500/10"
                     : confirmPassword && confirmPassword === newPassword
-                    ? "border-emerald-500/50 focus:border-emerald-500/50 focus:ring-emerald-500/20"
-                    : "border-white/10 focus:border-amber-500/50 focus:ring-amber-500/20"
+                    ? "border-teal-300 focus:border-teal-400 focus:ring-teal-500/10"
+                    : "border-gray-200 focus:border-teal-400 focus:ring-teal-500/10"
                 }`}
                 placeholder="Re-enter new password"
               />
               {confirmPassword && confirmPassword !== newPassword && (
-                <p className="text-[10px] text-red-400 mt-1">Passwords don't match</p>
+                <p className="text-[10px] text-red-500 mt-1 font-medium">Passwords don't match</p>
               )}
               {confirmPassword && confirmPassword === newPassword && (
-                <p className="text-[10px] text-emerald-400 mt-1">Passwords match</p>
+                <p className="text-[10px] text-teal-500 mt-1 font-medium">Passwords match</p>
               )}
             </div>
 
             {/* Requirements */}
-            <div className="bg-white/[0.02] border border-white/5 rounded-lg p-3 mb-5">
-              <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wider mb-2">Requirements</p>
-              <div className="grid grid-cols-2 gap-1">
+            <div className="bg-gray-50 border border-gray-100 rounded-xl p-3 mb-5">
+              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-2">Requirements</p>
+              <div className="grid grid-cols-2 gap-1.5">
                 {[
                   { met: newPassword.length >= 8, text: "8+ characters" },
                   { met: /[A-Z]/.test(newPassword), text: "Uppercase letter" },
@@ -343,10 +338,10 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
                   { met: /[0-9]/.test(newPassword), text: "Number" },
                 ].map(({ met, text }) => (
                   <div key={text} className="flex items-center gap-1.5">
-                    <div className={`w-3 h-3 rounded-full flex items-center justify-center ${met ? "bg-emerald-500/20" : "bg-white/5"}`}>
-                      {met && <svg className="w-2 h-2 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                    <div className={`w-3.5 h-3.5 rounded-full flex items-center justify-center ${met ? "bg-teal-100" : "bg-gray-100"}`}>
+                      {met && <svg className="w-2 h-2 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
                     </div>
-                    <span className={`text-[11px] ${met ? "text-emerald-400" : "text-slate-500"}`}>{text}</span>
+                    <span className={`text-[11px] font-medium ${met ? "text-teal-600" : "text-gray-400"}`}>{text}</span>
                   </div>
                 ))}
               </div>
@@ -354,20 +349,20 @@ function ChangePasswordModal({ onClose }: { onClose: () => void }) {
 
             {/* Error */}
             {error && (
-              <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-xs px-3 py-2 rounded-lg mb-4">
+              <div className="bg-red-50 border border-red-100 text-red-600 text-xs px-3 py-2.5 rounded-xl mb-4 font-medium">
                 {error}
               </div>
             )}
 
             {/* Actions */}
             <div className="flex justify-end gap-3">
-              <button type="button" onClick={onClose} className="px-4 py-2.5 text-sm font-medium text-slate-400 hover:text-white rounded-lg hover:bg-white/5 transition-all">
+              <button type="button" onClick={onClose} className="px-4 py-2.5 text-sm font-medium text-gray-500 hover:text-gray-700 rounded-xl hover:bg-gray-50 transition-all">
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={loading || passwordStrength.score < 4}
-                className="px-5 py-2.5 text-sm font-semibold text-white bg-gradient-to-r from-amber-500 to-orange-500 rounded-lg hover:from-amber-600 hover:to-orange-600 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-lg shadow-amber-500/20"
+                className="px-5 py-2.5 text-sm font-bold text-white bg-gradient-to-r from-teal-500 to-cyan-600 rounded-xl hover:from-teal-600 hover:to-cyan-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all shadow-lg shadow-teal-500/20"
               >
                 {loading ? "Updating..." : "Update Password"}
               </button>
