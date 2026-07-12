@@ -26,6 +26,24 @@ export function LoginPage() {
     }
   };
 
+  const handleForgotPassword = async () => {
+    if (!email) {
+      setError("Enter your email address first");
+      return;
+    }
+    try {
+      await fetch("/api/v1/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
+      setError("");
+      alert("If the email exists, a password reset link has been sent.");
+    } catch {
+      alert("Could not send reset email. Please try again.");
+    }
+  };
+
   return (
     <div className="min-h-screen relative overflow-hidden bg-[#f0f4f8]">
       {/* Animated gradient blobs */}
@@ -101,6 +119,12 @@ export function LoginPage() {
                 <>Sign In <ArrowRight className="w-4 h-4" /></>
               )}
             </button>
+
+            <div className="text-center">
+              <a href="/forgot-password" onClick={(e) => { e.preventDefault(); handleForgotPassword(); }} className="text-sm text-teal-600 hover:text-teal-700 font-medium cursor-pointer">
+                Forgot Password?
+              </a>
+            </div>
           </form>
         </div>
 

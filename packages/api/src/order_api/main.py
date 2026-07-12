@@ -174,6 +174,113 @@ class ChangePasswordRequest(BaseModel):
     new_password: str
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: str
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str
+
+
+@app.post("/api/v1/auth/forgot-password", tags=["auth"])
+async def forgot_password(body: ForgotPasswordRequest):
+    """Send a password reset email."""
+    import secrets
+
+    async with async_session_factory() as session:
+        result = await session.execute(
+            text("SELECT id, name, email FROM users WHERE email = :email AND active = true"),
+            {"email": body.email},
+        )
+        user = result.mappings().first()
+        if not user:
+            # Don't reveal whether email exists
+            return {"message": "If the email exists, a reset link has been sent."}
+
+        # Generate reset token (valid 1 hour)
+        reset_token = secrets.token_urlsafe(32)
+        await session.execute(
+            text("""
+                CREATE TABLE IF NOT EXISTS password_reset_tokens (
+                    token VARCHAR(100) PRIMARY KEY,
+                    user_id UUID NOT NULL,
+                    expires_at TIMESTAMPTZ NOT NULL,
+                    used BOOLEAN DEFAULT FALSE
+                )
+            """)
+        )
+        await session.execute(
+            text("""
+                INSERT INTO password_reset_tokens (token, user_id, expires_at)
+                VALUES (:token, :user_id, NOW() + INTERVAL '1 hour')
+            """),
+            {"token": reset_token, "user_id": str(user["id"])},
+        )
+        await session.commit()
+
+    # Send reset email
+    try:
+        from order_shared.adapters import get_adapters
+        from order_shared.adapters.base import EmailMessage
+        adapters = get_adapters()
+        # Use the app's origin for the reset link
+        reset_link = f"/reset-password?token={reset_token}"
+        await adapters.email.send_email(EmailMessage(
+            to=body.email,
+            subject="Password Reset Request",
+            body_html=f"<p>Hi {user['name']},</p><p>Click the link below to reset your password:</p><p><a href='{reset_link}'>Reset Password</a></p><p>This link expires in 1 hour.</p><p>If you did not request this, please ignore this email.</p>",
+            body_text=f"Hi {user['name']},\n\nReset your password: {reset_link}\n\nThis link expires in 1 hour.",
+        ))
+    except Exception:
+        pass
+
+    return {"message": "If the email exists, a reset link has been sent."}
+
+
+@app.post("/api/v1/auth/reset-password", tags=["auth"])
+async def reset_password(body: ResetPasswordRequest):
+    """Reset password using a valid token."""
+    from order_api.auth import hash_password
+
+    if len(body.new_password) < 8:
+        raise HTTPException(status_code=400, detail={"error": {"code": "BAD_REQUEST", "message": "Password must be at least 8 characters"}})
+    if not any(c.isupper() for c in body.new_password):
+        raise HTTPException(status_code=400, detail={"error": {"code": "BAD_REQUEST", "message": "Password must contain at least one uppercase letter"}})
+    if not any(c.islower() for c in body.new_password):
+        raise HTTPException(status_code=400, detail={"error": {"code": "BAD_REQUEST", "message": "Password must contain at least one lowercase letter"}})
+    if not any(c.isdigit() for c in body.new_password):
+        raise HTTPException(status_code=400, detail={"error": {"code": "BAD_REQUEST", "message": "Password must contain at least one number"}})
+
+    async with async_session_factory() as session:
+        result = await session.execute(
+            text("""
+                SELECT token, user_id FROM password_reset_tokens
+                WHERE token = :token AND used = false AND expires_at > NOW()
+            """),
+            {"token": body.token},
+        )
+        token_row = result.mappings().first()
+        if not token_row:
+            raise HTTPException(status_code=400, detail={"error": {"code": "BAD_REQUEST", "message": "Invalid or expired reset token"}})
+
+        # Update password
+        new_hash = hash_password(body.new_password)
+        await session.execute(
+            text("UPDATE users SET password_hash = :pw, token_version = COALESCE(token_version, 0) + 1 WHERE id = :id"),
+            {"pw": new_hash, "id": str(token_row["user_id"])},
+        )
+
+        # Mark token as used
+        await session.execute(
+            text("UPDATE password_reset_tokens SET used = true WHERE token = :token"),
+            {"token": body.token},
+        )
+        await session.commit()
+
+    return {"message": "Password reset successfully. You can now log in."}
+
+
 @app.post("/api/v1/auth/change-password", tags=["auth"])
 async def change_password(body: ChangePasswordRequest, current_user: CurrentUser = Depends(get_current_user)):
     """Change the current user's password."""

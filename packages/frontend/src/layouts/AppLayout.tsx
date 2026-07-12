@@ -14,6 +14,7 @@ import {
   Key,
   Menu,
   X,
+  Users,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -21,6 +22,7 @@ const NAV_ITEMS = [
   { path: "/orders", label: "Orders", icon: Package, minRole: "readonly" as const },
   { path: "/inbox", label: "Inbox", icon: Mail, minRole: "agent" as const },
   { path: "/queue", label: "Review Queue", icon: ClipboardCheck, minRole: "agent" as const },
+  { path: "/customers", label: "Customers", icon: Users, minRole: "supervisor" as const },
   { path: "/audit", label: "Audit Logs", icon: FileText, minRole: "supervisor" as const },
   { path: "/admin", label: "Administration", icon: Settings, minRole: "admin" as const },
 ];

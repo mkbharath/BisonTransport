@@ -10,6 +10,8 @@ import { InboxPage } from "./pages/InboxPage";
 import { ValidationQueuePage } from "./pages/ValidationQueuePage";
 import { AdminPage } from "./pages/AdminPage";
 import { AuditLogsPage } from "./pages/AuditLogsPage";
+import { CustomersPage } from "./pages/CustomersPage";
+import { ResetPasswordPage } from "./pages/ResetPasswordPage";
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated } = useAuth();
@@ -21,6 +23,7 @@ export default function App() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route
         path="/*"
         element={
@@ -36,6 +39,7 @@ export default function App() {
         <Route path="inbox" element={<InboxPage />} />
         <Route path="queue" element={<ValidationQueuePage />} />
         <Route path="admin" element={<AdminPage />} />
+        <Route path="customers" element={<CustomersPage />} />
         <Route path="audit" element={<AuditLogsPage />} />
       </Route>
     </Routes>
