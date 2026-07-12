@@ -225,3 +225,11 @@ export async function changePassword(currentPassword: string, newPassword: strin
     body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
   });
 }
+
+// --- Admin: Thresholds ---
+export async function getThresholds() {
+  return request<{ data: Record<string, number> }>("/admin/thresholds");
+}
+export async function updateThresholds(data: Record<string, number>) {
+  return request<{ message: string }>("/admin/thresholds", { method: "PUT", body: JSON.stringify(data) });
+}

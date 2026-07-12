@@ -636,10 +636,45 @@ const DEFAULT_THRESHOLDS: ThresholdConfig = {
 function ThresholdsTab() {
   const [thresholds, setThresholds] = useState<ThresholdConfig>(DEFAULT_THRESHOLDS);
   const [saved, setSaved] = useState(false);
+  const [loading, setLoading] = useState(true);
 
-  function handleSave() {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 3000);
+  // Load thresholds from API on mount
+  useState(() => {
+    (async () => {
+      try {
+        const { getThresholds } = await import("../lib/api");
+        const res = await getThresholds();
+        if (res.data) {
+          setThresholds({
+            auto_process_threshold: res.data.AUTO_PROCESS ?? 95,
+            human_review_lower_bound: res.data.HUMAN_REVIEW ?? 70,
+            auto_communication_threshold: res.data.AUTO_COMMUNICATION ?? 85,
+            customer_response_timeout_hours: res.data.CUSTOMER_RESPONSE_TIMEOUT_HOURS ?? 48,
+            follow_up_delay_hours: res.data.FOLLOWUP_DELAY_HOURS ?? 24,
+            duplicate_detection_window_hours: res.data.DUPLICATE_DETECTION_WINDOW_HOURS ?? 72,
+          });
+        }
+      } catch (e) { /* use defaults */ }
+      setLoading(false);
+    })();
+  });
+
+  async function handleSave() {
+    try {
+      const { updateThresholds } = await import("../lib/api");
+      await updateThresholds({
+        AUTO_PROCESS: thresholds.auto_process_threshold,
+        HUMAN_REVIEW: thresholds.human_review_lower_bound,
+        AUTO_COMMUNICATION: thresholds.auto_communication_threshold,
+        CUSTOMER_RESPONSE_TIMEOUT_HOURS: thresholds.customer_response_timeout_hours,
+        FOLLOWUP_DELAY_HOURS: thresholds.follow_up_delay_hours,
+        DUPLICATE_DETECTION_WINDOW_HOURS: thresholds.duplicate_detection_window_hours,
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
+    } catch (e) {
+      alert("Failed to save thresholds");
+    }
   }
 
   function updateVal(key: keyof ThresholdConfig, val: number) {
@@ -654,7 +689,7 @@ function ThresholdsTab() {
 
       <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm max-w-2xl">
         <p className="text-xs text-gray-500 mb-6">
-          These values are currently loaded from environment variables. Changes here will take effect after agents restart.
+          Changes take effect immediately — agents read thresholds from the database on each order validation.
         </p>
 
         <div className="space-y-6">
@@ -673,7 +708,7 @@ function ThresholdsTab() {
           </button>
           {saved && (
             <span className="text-sm text-emerald-600 font-medium animate-fade-in">
-              Saved — restart agents to apply
+              Saved — changes effective immediately
             </span>
           )}
         </div>

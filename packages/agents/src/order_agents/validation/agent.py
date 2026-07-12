@@ -134,12 +134,26 @@ class ValidationAgent(BaseAgent):
                 # All "missing" fields have some confidence — extraction format issue → HITL
                 has_missing = False
 
+        # Load thresholds from database (admin-configured)
+        db_thresholds: dict[str, float] = {}
+        try:
+            async with async_session_factory() as session:
+                result = await session.execute(
+                    text("SELECT key, value FROM system_config WHERE category = 'threshold'")
+                )
+                for row in result.mappings():
+                    db_thresholds[row["key"]] = float(row["value"])
+        except Exception:
+            # Table may not exist yet; fall back to env vars
+            pass
+
         route = route_by_confidence(
             overall_confidence=overall_confidence,
             has_missing_mandatory=has_missing,
             is_duplicate=is_duplicate,
             is_hazmat=is_hazmat,
             customer_always_hitl=customer_always_hitl,
+            db_thresholds=db_thresholds,
         )
 
         self.logger.info(

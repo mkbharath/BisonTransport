@@ -522,3 +522,64 @@ def _serialize_row(row: dict) -> dict:
 
 def _serialize_rows(rows: list[dict]) -> list[dict]:
     return [_serialize_row(r) for r in rows]
+
+
+# --- System Config (Thresholds) ---
+
+
+@router.get("/thresholds")
+async def get_thresholds(current_user: CurrentUser = Depends(require_role("agent"))):
+    """Get all threshold configurations."""
+    async with async_session_factory() as session:
+        # Try to read from system_config table
+        try:
+            result = await session.execute(
+                text("SELECT key, value FROM system_config WHERE category = 'threshold'")
+            )
+            rows = {r["key"]: float(r["value"]) for r in result.mappings()}
+        except Exception:
+            rows = {}
+
+    # Merge with defaults (env vars as fallback)
+    import os
+    defaults = {
+        "AUTO_PROCESS": float(os.environ.get("THRESHOLD_AUTO_PROCESS", "95")),
+        "HUMAN_REVIEW": float(os.environ.get("THRESHOLD_HUMAN_REVIEW", "80")),
+        "AUTO_COMMUNICATION": float(os.environ.get("THRESHOLD_AUTO_COMMUNICATION", "70")),
+        "CUSTOMER_RESPONSE_TIMEOUT_HOURS": float(os.environ.get("CUSTOMER_RESPONSE_TIMEOUT_HOURS", "48")),
+        "FOLLOWUP_DELAY_HOURS": float(os.environ.get("FOLLOWUP_DELAY_HOURS", "24")),
+        "DUPLICATE_DETECTION_WINDOW_HOURS": float(os.environ.get("DUPLICATE_DETECTION_WINDOW_HOURS", "72")),
+    }
+    # DB values override defaults
+    merged = {**defaults, **rows}
+    return {"data": merged}
+
+
+@router.put("/thresholds")
+async def update_thresholds(
+    body: dict,
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    """Update threshold configurations. Stored in system_config table."""
+    async with async_session_factory() as session:
+        # Create table if not exists
+        await session.execute(text("""
+            CREATE TABLE IF NOT EXISTS system_config (
+                key VARCHAR(100) PRIMARY KEY,
+                value VARCHAR(255) NOT NULL,
+                category VARCHAR(50) NOT NULL DEFAULT 'threshold',
+                updated_at TIMESTAMPTZ DEFAULT NOW()
+            )
+        """))
+
+        for key, value in body.items():
+            if key == "data":
+                continue
+            await session.execute(text("""
+                INSERT INTO system_config (key, value, category, updated_at)
+                VALUES (:key, :value, 'threshold', NOW())
+                ON CONFLICT (key) DO UPDATE SET value = :value, updated_at = NOW()
+            """), {"key": key, "value": str(value)})
+
+        await session.commit()
+    return {"message": "Thresholds updated successfully"}

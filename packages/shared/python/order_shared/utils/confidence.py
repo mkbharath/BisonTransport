@@ -13,8 +13,10 @@ class ConfidenceRoute:
     reason: str = ""
 
 
-def get_threshold(name: str, default: int) -> float:
-    """Get a threshold value from environment or return default."""
+def get_threshold(name: str, default: int, db_thresholds: dict[str, float] | None = None) -> float:
+    """Get a threshold value. Priority: db_thresholds > env var > default."""
+    if db_thresholds and name in db_thresholds:
+        return db_thresholds[name]
     return float(os.environ.get(f"THRESHOLD_{name}", str(default)))
 
 
@@ -60,6 +62,7 @@ def route_by_confidence(
     is_duplicate: bool = False,
     is_hazmat: bool = False,
     customer_always_hitl: bool = False,
+    db_thresholds: dict[str, float] | None = None,
 ) -> ConfidenceRoute:
     """Determine routing based on confidence score and validation results.
 
@@ -72,9 +75,9 @@ def route_by_confidence(
     - Missing mandatory + auto-comm threshold met → communication queue
     - < human_review threshold → exception queue
     """
-    auto_process = get_threshold("AUTO_PROCESS", 95)
-    human_review = get_threshold("HUMAN_REVIEW", 80)
-    auto_comm = get_threshold("AUTO_COMMUNICATION", 70)
+    auto_process = get_threshold("AUTO_PROCESS", 95, db_thresholds)
+    human_review = get_threshold("HUMAN_REVIEW", 80, db_thresholds)
+    auto_comm = get_threshold("AUTO_COMMUNICATION", 70, db_thresholds)
 
     # Priority overrides
     if is_hazmat:
