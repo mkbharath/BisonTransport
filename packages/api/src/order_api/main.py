@@ -48,6 +48,30 @@ async def lifespan(app: FastAPI):
     logger.info("Starting Order Intelligence Platform API")
     create_adapters()
     logger.info("Adapters initialized")
+
+    # Ensure token_version column exists (migration)
+    try:
+        async with async_session_factory() as session:
+            await session.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS token_version INTEGER DEFAULT 0"))
+            await session.commit()
+    except Exception as e:
+        logger.warning(f"Could not add token_version column: {e}")
+
+    # Ensure system_config table exists
+    try:
+        async with async_session_factory() as session:
+            await session.execute(text("""
+                CREATE TABLE IF NOT EXISTS system_config (
+                    key VARCHAR(100) PRIMARY KEY,
+                    value VARCHAR(255) NOT NULL,
+                    category VARCHAR(50) NOT NULL DEFAULT 'threshold',
+                    updated_at TIMESTAMPTZ DEFAULT NOW()
+                )
+            """))
+            await session.commit()
+    except Exception as e:
+        logger.warning(f"Could not create system_config table: {e}")
+
     yield
     # Shutdown
     logger.info("Shutting down Order Intelligence Platform API")
@@ -134,6 +158,7 @@ async def login(request: Request, body: LoginRequest):
         "email": user["email"],
         "role": user["role"],
         "name": user["name"],
+        "tv": user.get("token_version", 0),
     }
 
     return TokenResponse(
@@ -176,10 +201,10 @@ async def change_password(body: ChangePasswordRequest, current_user: CurrentUser
         if not verify_password(body.current_password, user_row["password_hash"]):
             raise HTTPException(status_code=400, detail={"error": {"code": "BAD_REQUEST", "message": "Current password is incorrect"}})
 
-        # Update password with bcrypt
+        # Update password with bcrypt and increment token_version
         new_hash = hash_password(body.new_password)
         await session.execute(
-            text("UPDATE users SET password_hash = :pw WHERE id = :id"),
+            text("UPDATE users SET password_hash = :pw, token_version = COALESCE(token_version, 0) + 1 WHERE id = :id"),
             {"pw": new_hash, "id": current_user.id},
         )
         await session.commit()

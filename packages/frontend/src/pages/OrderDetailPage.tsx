@@ -1,8 +1,8 @@
 import { useState, useCallback } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams, Link } from "react-router-dom";
-import { getOrder, updateOrder } from "../lib/api";
-import { ArrowLeft, CheckCircle, Clock, AlertTriangle, XCircle, Pencil, Save, X } from "lucide-react";
+import { getOrder, updateOrder, cloneOrder } from "../lib/api";
+import { ArrowLeft, CheckCircle, Clock, AlertTriangle, XCircle, Pencil, Save, X, Copy } from "lucide-react";
 
 // --- Utility types ---
 
@@ -475,6 +475,7 @@ export function OrderDetailPage() {
         <CircularConfidence score={order.overall_confidence_score} />
 
         {!editing && (
+          <>
           <button
             onClick={startEditing}
             className="ml-auto inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
@@ -482,6 +483,20 @@ export function OrderDetailPage() {
             <Pencil className="w-3.5 h-3.5" />
             Edit
           </button>
+          <button
+            onClick={async () => {
+              try {
+                const result = await cloneOrder(order.id);
+                alert(`Order cloned: ${result.order_number}`);
+                window.location.href = `/orders/${result.id}`;
+              } catch { alert("Clone failed"); }
+            }}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
+          >
+            <Copy className="w-3.5 h-3.5" />
+            Clone
+          </button>
+          </>
         )}
 
         {editing && (

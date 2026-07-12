@@ -99,27 +99,43 @@ async def reclassify_email(
     email_id: str,
     current_user: CurrentUser = Depends(require_role("agent")),
 ):
-    """Trigger reclassification of an email."""
+    """Reclassify an email and re-trigger the processing pipeline."""
     async with async_session_factory() as session:
         result = await session.execute(
-            text("SELECT id FROM emails WHERE id = :id"), {"id": email_id}
+            text("SELECT id, body_text FROM emails WHERE id = :id"), {"id": email_id}
         )
-        if not result.first():
+        email_row = result.mappings().first()
+        if not email_row:
             raise HTTPException(
                 status_code=404,
                 detail={"error": {"code": "NOT_FOUND", "message": "Email not found"}},
             )
 
+        # Update classification to new_order and reset status
         await session.execute(
             text("""
-                UPDATE emails SET status = 'pending_reclassification', updated_at = NOW()
+                UPDATE emails SET classification = 'new_order', status = 'reprocessing', updated_at = NOW()
                 WHERE id = :id
             """),
             {"id": email_id},
         )
         await session.commit()
 
-    return {"message": "Email queued for reclassification", "email_id": email_id}
+    # Push to document-processing queue to re-trigger pipeline
+    try:
+        adapters = get_adapters()
+        await adapters.queue.publish_message(
+            queue_name="document-processing",
+            body={
+                "email_id": email_id,
+                "attachment_ids": [],
+                "reclassified_by": current_user.email,
+            },
+        )
+    except Exception:
+        pass
+
+    return {"message": "Email reclassified and queued for reprocessing", "email_id": email_id}
 
 
 @router.get("/{email_id}/attachments/{attachment_id}/url")

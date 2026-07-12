@@ -413,7 +413,11 @@ async def reject_order(
     body: ApproveRejectRequest | None = None,
     current_user: CurrentUser = Depends(require_role("agent")),
 ):
-    """Reject an order — moves it to 'cancelled'."""
+    """Reject an order — moves it to 'cancelled', logs reason, notifies customer."""
+    import json as json_mod
+
+    comments = body.comments if body else None
+
     async with async_session_factory() as session:
         result = await session.execute(
             text("""
@@ -422,15 +426,16 @@ async def reject_order(
                     reviewed_at = NOW(), updated_at = NOW(),
                     internal_comments = COALESCE(:comments, internal_comments)
                 WHERE id = :id AND status IN ('extracted', 'validated', 'pending_review')
-                RETURNING id
+                RETURNING id, order_number, contact_email, customer_name
             """),
             {
                 "id": order_id,
                 "user_id": current_user.id,
-                "comments": body.comments if body else None,
+                "comments": comments,
             },
         )
-        if not result.first():
+        row = result.mappings().first()
+        if not row:
             raise HTTPException(
                 status_code=400,
                 detail={
@@ -440,18 +445,42 @@ async def reject_order(
                     }
                 },
             )
-        await session.commit()
 
+        order_number = row["order_number"]
+        contact_email = row["contact_email"]
+        customer_name = row["customer_name"]
+
+        # Log to order history with rejection reason
         await session.execute(
             text("""
-                INSERT INTO order_history (id, order_id, event_type, new_status, triggered_by, actor_id, created_at)
-                VALUES (gen_random_uuid(), :order_id, 'order.rejected', 'cancelled', 'user', :actor_id, NOW())
+                INSERT INTO order_history (id, order_id, event_type, previous_status, new_status, triggered_by, actor_id, detail_json, created_at)
+                VALUES (gen_random_uuid(), :order_id, 'order.rejected', 'pending_review', 'cancelled', 'user', :actor_id, :detail, NOW())
             """),
-            {"order_id": order_id, "actor_id": current_user.id},
+            {
+                "order_id": order_id,
+                "actor_id": current_user.id,
+                "detail": json_mod.dumps({"reason": comments or "No reason provided", "rejected_by": current_user.name}),
+            },
         )
         await session.commit()
 
-    return {"message": "Order rejected", "order_id": order_id, "status": "rejected"}
+    # Send rejection notification email to customer
+    if contact_email:
+        try:
+            adapters = get_adapters()
+            from order_shared.adapters.base import EmailMessage
+            name = customer_name or "Customer"
+            email_msg = EmailMessage(
+                to=contact_email,
+                subject=f"Order Update: {order_number}",
+                body_html=f"<p>Dear {name},</p><p>We regret to inform you that your transportation order <strong>{order_number}</strong> could not be processed.</p><p><strong>Reason:</strong> {comments or 'Order did not meet requirements'}</p><p>Please contact us if you have questions or would like to resubmit.</p><p>Best regards,<br>Order Processing Team</p>",
+                body_text=f"Dear {name},\n\nYour order {order_number} could not be processed.\nReason: {comments or 'Order did not meet requirements'}\n\nPlease contact us if you have questions.\n\nBest regards,\nOrder Processing Team",
+            )
+            await adapters.email.send_email(email_msg)
+        except Exception:
+            pass  # Non-critical
+
+    return {"message": "Order rejected", "order_id": order_id, "status": "cancelled"}
 
 
 @router.post("/{order_id}/clone")

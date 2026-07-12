@@ -127,6 +127,23 @@ async def get_current_user(
             raise credentials_exception
         if payload.get("type") != "access":
             raise credentials_exception
+
+        # Check token_version against DB (invalidates old tokens after password change)
+        token_version = payload.get("tv", 0)
+        try:
+            async with async_session_factory() as session:
+                result = await session.execute(
+                    text("SELECT COALESCE(token_version, 0) as tv FROM users WHERE id = :id"),
+                    {"id": user_id},
+                )
+                row = result.first()
+                if row and row[0] != token_version:
+                    raise credentials_exception
+        except HTTPException:
+            raise
+        except Exception:
+            pass  # If column doesn't exist yet, skip check
+
         return CurrentUser(
             id=user_id,
             email=payload.get("email", ""),
@@ -163,7 +180,7 @@ async def authenticate_user(email: str, password: str) -> dict[str, Any] | None:
     """Authenticate user by email/password. Returns user dict or None."""
     async with async_session_factory() as session:
         result = await session.execute(
-            text("SELECT id, email, name, role, password_hash, active FROM users WHERE email = :email"),
+            text("SELECT id, email, name, role, password_hash, active, COALESCE(token_version, 0) as token_version FROM users WHERE email = :email"),
             {"email": email},
         )
         user = result.mappings().first()

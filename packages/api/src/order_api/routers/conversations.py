@@ -105,11 +105,16 @@ async def reply_to_conversation(
     body: ReplyRequest,
     current_user: CurrentUser = Depends(require_role("agent")),
 ):
-    """Add a reply to a conversation."""
+    """Add a reply to a conversation and send via MS Graph."""
     async with async_session_factory() as session:
-        # Verify conversation exists
+        # Verify conversation exists and get customer email
         result = await session.execute(
-            text("SELECT * FROM conversations WHERE id = :id"),
+            text("""
+                SELECT c.*, e.from_address as customer_email, e.message_id as original_message_id
+                FROM conversations c
+                LEFT JOIN emails e ON e.conversation_id = c.id
+                WHERE c.id = :id
+            """),
             {"id": conversation_id},
         )
         conversation = result.mappings().first()
@@ -119,13 +124,15 @@ async def reply_to_conversation(
                 detail={"error": {"code": "NOT_FOUND", "message": "Conversation not found"}},
             )
 
+        customer_email = conversation.get("customer_email")
+
         msg_id = str(uuid.uuid4())
         await session.execute(
             text("""
                 INSERT INTO conversation_messages
                     (id, conversation_id, direction, from_address, subject, body_text, body_html, sent_at, delivery_status)
                 VALUES
-                    (:id, :cid, 'outbound', :from_addr, :subject, :body_text, :body_html, NOW(), 'sent')
+                    (:id, :cid, 'outbound', :from_addr, :subject, :body_text, :body_html, NOW(), :status)
             """),
             {
                 "id": msg_id,
@@ -134,6 +141,7 @@ async def reply_to_conversation(
                 "subject": body.subject,
                 "body_text": body.body_text,
                 "body_html": body.body_html,
+                "status": "sending",
             },
         )
 
@@ -143,6 +151,37 @@ async def reply_to_conversation(
             {"id": conversation_id},
         )
         await session.commit()
+
+    # Send via MS Graph
+    if customer_email:
+        try:
+            from order_shared.adapters import get_adapters
+            from order_shared.adapters.base import EmailMessage
+            adapters = get_adapters()
+            email_msg = EmailMessage(
+                to=customer_email,
+                subject=body.subject or "Re: Order Inquiry",
+                body_html=body.body_html or f"<p>{body.body_text}</p>",
+                body_text=body.body_text,
+                in_reply_to=conversation.get("original_message_id"),
+            )
+            await adapters.email.send_email(email_msg)
+
+            # Update delivery status
+            async with async_session_factory() as session:
+                await session.execute(
+                    text("UPDATE conversation_messages SET delivery_status = 'delivered' WHERE id = :id"),
+                    {"id": msg_id},
+                )
+                await session.commit()
+        except Exception as e:
+            # Mark as failed
+            async with async_session_factory() as session:
+                await session.execute(
+                    text("UPDATE conversation_messages SET delivery_status = 'failed' WHERE id = :id"),
+                    {"id": msg_id},
+                )
+                await session.commit()
 
     return {"message": "Reply sent", "message_id": msg_id}
 

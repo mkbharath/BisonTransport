@@ -233,3 +233,8 @@ export async function getThresholds() {
 export async function updateThresholds(data: Record<string, number>) {
   return request<{ message: string }>("/admin/thresholds", { method: "PUT", body: JSON.stringify(data) });
 }
+
+// --- Orders: Clone ---
+export async function cloneOrder(orderId: string) {
+  return request<any>(`/orders/${orderId}/clone`, { method: "POST" });
+}
