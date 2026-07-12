@@ -219,6 +219,13 @@ async def create_order(
         except Exception as e:
             print(f"[ORDER-API] FAILED to send confirmation email to {body.contact_email}: {type(e).__name__}: {e}")
 
+    # Fire webhook for manual order creation
+    try:
+        from order_shared.utils.webhooks import fire_webhooks
+        await fire_webhooks("order_created", {"order_id": order_id, "order_number": order_number, "status": initial_status, "customer_name": body.customer_name, "created_by": current_user.name})
+    except Exception:
+        pass
+
     return _serialize_row(order)
 
 
@@ -404,6 +411,13 @@ async def approve_order(
     except Exception:
         pass  # Non-critical: email failure shouldn't block approval
 
+    # Fire webhooks
+    try:
+        from order_shared.utils.webhooks import fire_webhooks
+        await fire_webhooks("order.approved", {"order_id": order_id, "order_number": order_number, "status": "order_created", "customer_name": customer_name, "approved_by": current_user.name})
+    except Exception:
+        pass
+
     return {"message": "Order approved", "order_id": order_id, "status": "order_created"}
 
 
@@ -479,6 +493,13 @@ async def reject_order(
             await adapters.email.send_email(email_msg)
         except Exception:
             pass  # Non-critical
+
+    # Fire webhooks
+    try:
+        from order_shared.utils.webhooks import fire_webhooks
+        await fire_webhooks("order.rejected", {"order_id": order_id, "order_number": order_number, "status": "cancelled", "customer_name": customer_name, "reason": comments, "rejected_by": current_user.name})
+    except Exception:
+        pass
 
     return {"message": "Order rejected", "order_id": order_id, "status": "cancelled"}
 

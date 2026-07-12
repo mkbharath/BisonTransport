@@ -583,3 +583,101 @@ async def update_thresholds(
 
         await session.commit()
     return {"message": "Thresholds updated successfully"}
+
+
+# --- Notifications ---
+
+
+@router.get("/notifications")
+async def get_notifications(
+    limit: int = Query(10, ge=1, le=50),
+    current_user: CurrentUser = Depends(get_current_user),
+):
+    """Get recent order events as notifications."""
+    async with async_session_factory() as session:
+        result = await session.execute(
+            text("""
+                SELECT oh.id, oh.order_id, oh.event_type, oh.new_status, oh.triggered_by,
+                       oh.actor_id, oh.detail_json, oh.created_at,
+                       o.order_number, o.customer_name
+                FROM order_history oh
+                JOIN orders o ON o.id = oh.order_id
+                ORDER BY oh.created_at DESC
+                LIMIT :limit
+            """),
+            {"limit": limit},
+        )
+        rows = [dict(r._mapping) for r in result]
+    return {"data": _serialize_rows(rows)}
+
+
+# --- Webhooks ---
+
+
+class WebhookRequest(BaseModel):
+    url: str
+    events: list[str]  # e.g. ["order_created", "order.approved", "order.rejected"]
+    active: bool = True
+    secret: str | None = None
+
+
+@router.get("/webhooks")
+async def list_webhooks(current_user: CurrentUser = Depends(require_role("admin"))):
+    """List configured webhooks."""
+    async with async_session_factory() as session:
+        # Ensure table exists
+        await session.execute(text("""
+            CREATE TABLE IF NOT EXISTS webhooks (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                url VARCHAR(500) NOT NULL,
+                events TEXT[] NOT NULL,
+                active BOOLEAN DEFAULT true,
+                secret VARCHAR(255),
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            )
+        """))
+        await session.commit()
+        result = await session.execute(text("SELECT * FROM webhooks ORDER BY created_at DESC"))
+        rows = [dict(r._mapping) for r in result]
+    return {"data": _serialize_rows(rows)}
+
+
+@router.post("/webhooks", status_code=201)
+async def create_webhook(
+    body: WebhookRequest,
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    """Create a new webhook endpoint."""
+    webhook_id = str(uuid.uuid4())
+    async with async_session_factory() as session:
+        await session.execute(text("""
+            CREATE TABLE IF NOT EXISTS webhooks (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                url VARCHAR(500) NOT NULL,
+                events TEXT[] NOT NULL,
+                active BOOLEAN DEFAULT true,
+                secret VARCHAR(255),
+                created_at TIMESTAMPTZ DEFAULT NOW()
+            )
+        """))
+        await session.execute(
+            text("""
+                INSERT INTO webhooks (id, url, events, active, secret, created_at)
+                VALUES (:id, :url, :events, :active, :secret, NOW())
+            """),
+            {"id": webhook_id, "url": body.url, "events": body.events, "active": body.active, "secret": body.secret},
+        )
+        await session.commit()
+    return {"id": webhook_id, "url": body.url, "events": body.events, "active": body.active}
+
+
+@router.delete("/webhooks/{webhook_id}", status_code=204)
+async def delete_webhook(
+    webhook_id: str,
+    current_user: CurrentUser = Depends(require_role("admin")),
+):
+    """Delete a webhook."""
+    async with async_session_factory() as session:
+        await session.execute(text("DELETE FROM webhooks WHERE id = :id"), {"id": webhook_id})
+        await session.commit()
+    return None

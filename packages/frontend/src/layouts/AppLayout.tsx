@@ -2,6 +2,7 @@ import { Link, Outlet, useLocation } from "react-router-dom";
 import { useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { changePassword } from "../lib/api";
+import { NotificationBell } from "../components/NotificationBell";
 import {
   LayoutDashboard,
   Package,
@@ -150,6 +151,9 @@ export function AppLayout() {
           />
         </div>
         {/* Content */}
+        <div className="hidden lg:flex items-center justify-end px-6 py-2 border-b border-gray-100 bg-white">
+          <NotificationBell />
+        </div>
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 bg-slate-50">
           <div className="animate-fade-in max-w-[1400px]">
             <Outlet />
