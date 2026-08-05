@@ -10,7 +10,7 @@ from sqlalchemy import text
 
 from order_shared.db.session import async_session_factory
 
-from order_api.auth import CurrentUser, require_role
+from order_api.auth import CurrentUser, get_current_user, require_role
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
 
